@@ -16,6 +16,10 @@
 /* ========================================================================
    2. ESTRUCTURA BASE DE LA APLICACIÓN Y SCROLL
    ======================================================================== */
+html.origen-app-html {
+    overflow-x: hidden;
+}
+
 body.origen-app-body {
     margin: 0;
     padding: 0;
@@ -25,20 +29,18 @@ body.origen-app-body {
     min-height: 100vh;
     background-image: radial-gradient(circle at top right, rgba(249, 115, 22, 0.1) 0%, transparent 50%);
     overflow-x: hidden;
-    overflow-y: auto;
 }
 
 .origen-app-wrapper {
     margin: 0 auto;
     width: 100%;
-    max-width: 500px;
+    max-width: 1200px;
     background-color: var(--bg-dark);
     min-height: 100vh;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     position: relative;
-    overflow-x: hidden;
 }
 
 .origen-app-header {
@@ -224,6 +226,12 @@ body.origen-app-body {
     gap: 15px;
 }
 
+@media (min-width: 768px) {
+    .origen-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 .origen-input-group {
     margin-bottom: 20px;
 }
@@ -304,6 +312,12 @@ body.origen-app-body {
     padding: 15px;
     border-radius: 10px;
     margin-bottom: 20px;
+}
+
+.origen-auth-box {
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 /* ========================================================================
@@ -477,6 +491,19 @@ input[type=range]::-webkit-slider-thumb {
     display: flex;
     flex-direction: column;
     gap: 15px;
+}
+
+@media (min-width: 768px) {
+    .origen-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .origen-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .origen-card-btn {
@@ -766,6 +793,12 @@ input[type=range]::-webkit-slider-thumb {
     margin-bottom: 20px;
 }
 
+@media (min-width: 768px) {
+    .origen-grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 .calc-card {
     background: var(--surface-dark);
     padding: 20px 15px;
@@ -852,11 +885,23 @@ input[type=range]::-webkit-slider-thumb {
     margin-bottom: 8px;
 }
 
-/* CUADRÍCULA DE PRODUCTOS FORZADA A DOS COLUMNAS */
+/* CUADRÍCULA DE PRODUCTOS */
 .origen-store-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Siempre 2 columnas */
+    grid-template-columns: 1fr 1fr;
     gap: 15px;
+}
+
+@media (min-width: 768px) {
+    .origen-store-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .origen-store-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .origen-product-card {
