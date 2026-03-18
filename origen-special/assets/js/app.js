@@ -19,7 +19,7 @@ jQuery(document).ready(function($) {
         btn.addClass('active');
 
         // Mostrar el formulario destino
-        const formId = targetId.includes('calc') ? targetId + '-form' : 'origen-' + targetId + '-form';
+        const formId = targetId.includes('calc') ? 'origen-' + targetId + '-form' : 'origen-' + targetId + '-form';
         $('#' + formId).fadeIn(300);
     });
 

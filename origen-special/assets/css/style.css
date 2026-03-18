@@ -25,6 +25,7 @@ body.origen-app-body {
     min-height: 100vh;
     background-image: radial-gradient(circle at top right, rgba(249, 115, 22, 0.1) 0%, transparent 50%);
     overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .origen-app-wrapper {
