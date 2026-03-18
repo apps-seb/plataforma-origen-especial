@@ -24,6 +24,19 @@ jQuery(document).ready(function($) {
     });
 
     // ==========================================
+    // MOSTRAR FORMULARIOS DE AUTENTICACIÓN
+    // ==========================================
+    $('#btn-show-auth').on('click', function(e) {
+        e.preventDefault();
+        $('.origen-landing-hero').fadeOut(300, function() {
+            $('#origen-auth-box').fadeIn(300);
+
+            // Si quieres activar el tab de registro automáticamente
+            $('.origen-tab-btn[data-target="register"]').click();
+        });
+    });
+
+    // ==========================================
     // 2. TOGGLE CONTRASEÑA
     // ==========================================
     $('.toggle-pass').on('click', function() {
