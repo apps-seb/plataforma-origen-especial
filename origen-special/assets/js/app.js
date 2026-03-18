@@ -3,7 +3,7 @@ jQuery(document).ready(function($) {
     // ==========================================
     // 1. TABS GENERALES (LOGIN/REGISTRO Y SIMULADOR)
     // ==========================================
-    $('.origen-tab-btn').on('click', function(e) {
+    $(document).on('click', '.origen-tab-btn', function(e) {
         e.preventDefault();
         const btn = $(this);
         const targetId = btn.data('target');
@@ -19,8 +19,13 @@ jQuery(document).ready(function($) {
         btn.addClass('active');
 
         // Mostrar el formulario destino
-        const formId = targetId.includes('calc') ? 'origen-' + targetId + '-form' : 'origen-' + targetId + '-form';
+        const formId = 'origen-' + targetId + '-form';
         $('#' + formId).fadeIn(300);
+
+        // Si es el simulador, forzar recálculo para asegurar que se muestre con valores base
+        if (targetId === 'calc-sim' && typeof calcularSimuladorEnVivo === 'function') {
+            setTimeout(calcularSimuladorEnVivo, 100);
+        }
     });
 
     // ==========================================
@@ -198,7 +203,7 @@ jQuery(document).ready(function($) {
     // ==========================================
     // 5. NAVEGACIÓN SPA DEL DASHBOARD (CORREGIDA)
     // ==========================================
-    $('.nav-trigger').on('click', function(e) {
+    $(document).on('click', '.nav-trigger', function(e) {
         e.preventDefault();
         const targetId = $(this).data('target');
 
@@ -210,7 +215,9 @@ jQuery(document).ready(function($) {
 
         // Si entra al simulador, disparar el cálculo inicial
         if(targetId === 'origen-view-produccion') {
-            calcularSimuladorEnVivo();
+            if(typeof calcularSimuladorEnVivo === 'function') {
+                setTimeout(calcularSimuladorEnVivo, 100);
+            }
         }
     });
 
@@ -335,11 +342,6 @@ jQuery(document).ready(function($) {
 
     // Escuchar cualquier cambio en los sliders para recalcular en vivo
     $('#sim_ha, #sim_densidad, #sim_variedad, #sim_edad, #sim_fertilizacion, #sim_humedad, #sim_perdidas, #sim_precio, #sim_costo').on('input change', calcularSimuladorEnVivo);
-
-    // Forzar calculo al cambiar a la pestaña de simulador
-    $('.origen-tab-btn[data-target="calc-sim"]').on('click', function(){
-        setTimeout(calcularSimuladorEnVivo, 100);
-    });
 
     // ==========================================
     // 8. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
