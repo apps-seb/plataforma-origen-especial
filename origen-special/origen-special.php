@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Origen SPECIAL Agro Platform
  * Description: Plataforma tipo app premium para la cadena de valor del café. Tienda Inteligente.
- * Version: 4.2.0 (Diseño Tienda y Scroll)
+ * Version: 4.3.0 (Fix Scroll y Simulador)
  * Author: Tu Nombre
  */
 
@@ -164,8 +164,8 @@ function origen_descuento_rol_caficultor( $price, $product ) {
 add_action( 'wp_enqueue_scripts', 'origen_special_assets' );
 function origen_special_assets() {
     if ( is_page( 'caficultores' ) ) {
-        $css_ver = file_exists(plugin_dir_path(__FILE__) . 'assets/css/style.css') ? filemtime(plugin_dir_path(__FILE__) . 'assets/css/style.css') : '4.2.0';
-        $js_ver = file_exists(plugin_dir_path(__FILE__) . 'assets/js/app.js') ? filemtime(plugin_dir_path(__FILE__) . 'assets/js/app.js') : '4.2.0';
+        $css_ver = file_exists(plugin_dir_path(__FILE__) . 'assets/css/style.css') ? filemtime(plugin_dir_path(__FILE__) . 'assets/css/style.css') : '4.3.0';
+        $js_ver = file_exists(plugin_dir_path(__FILE__) . 'assets/js/app.js') ? filemtime(plugin_dir_path(__FILE__) . 'assets/js/app.js') : '4.3.0';
 
         wp_enqueue_style( 'origen-style', plugin_dir_url( __FILE__ ) . 'assets/css/style.css', array(), $css_ver );
         wp_enqueue_script( 'origen-js', plugin_dir_url( __FILE__ ) . 'assets/js/app.js', array('jquery'), $js_ver, true );
