@@ -196,7 +196,11 @@ function origen_special_template( $template ) {
 // ========================================================================
 add_shortcode( 'origen_special_register', 'origen_special_register_html' );
 function origen_special_register_html() {
-    ob_start(); ?>
+    ob_start();
+    $is_logged_in = is_user_logged_in();
+
+    if ( ! $is_logged_in ) :
+    ?>
     <div class="origen-landing-hero">
         <h2 class="hero-title"><i class="ph-fill ph-plant"></i> Portal Exclusivo para Caficultores</h2>
         <p class="hero-desc">Un espacio profesional y robusto diseñado para potenciar tu labor cafetera. Toma el control de tu producción y maximiza tu rentabilidad.</p>
@@ -209,12 +213,13 @@ function origen_special_register_html() {
             <li><i class="ph ph-star"></i> <span>Accede a beneficios y precios especiales exclusivos.</span></li>
         </ul>
 
-        <a href="https://mercacol.com.co/caficultores/" class="origen-btn hero-btn" target="_blank" rel="noopener noreferrer">
+        <button id="btn-show-auth" class="origen-btn hero-btn">
             <i class="ph ph-user-plus"></i> Regístrate Ahora
-        </a>
+        </button>
     </div>
+    <?php endif; ?>
 
-    <div class="origen-auth-box">
+    <div id="origen-auth-box" class="origen-auth-box" style="<?php echo $is_logged_in ? '' : 'display: none;'; ?>">
         <div class="origen-tabs">
             <button class="origen-tab-btn active" data-target="login">
                 <i class="ph ph-sign-in"></i> Ingresar
