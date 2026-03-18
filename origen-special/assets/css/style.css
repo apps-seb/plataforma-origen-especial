@@ -22,10 +22,9 @@ body.origen-app-body {
     background-color: var(--bg-dark);
     color: var(--text-main);
     font-family: 'Inter', sans-serif;
-    display: block;
     min-height: 100vh;
     background-image: radial-gradient(circle at top right, rgba(249, 115, 22, 0.1) 0%, transparent 50%);
-    overflow-x: hidden; /* PERMITE EL SCROLL VERTICAL GENERAL */
+    overflow-x: hidden;
 }
 
 .origen-app-wrapper {
@@ -35,7 +34,7 @@ body.origen-app-body {
     background-color: var(--bg-dark);
     min-height: 100vh;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    display: block;
+    display: flex;
     flex-direction: column;
     position: relative;
     overflow-x: hidden;
@@ -82,7 +81,7 @@ body.origen-app-body {
    3. SISTEMA DE PESTAÑAS (TABS)
    ======================================================================== */
 .origen-tabs {
-    display: block;
+    display: flex;
     margin-bottom: 30px;
     background: var(--surface-dark);
     border-radius: 12px;
@@ -100,7 +99,7 @@ body.origen-app-body {
     cursor: pointer;
     border-radius: 8px;
     transition: all 0.3s ease;
-    display: block;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -123,7 +122,7 @@ body.origen-app-body {
    ======================================================================== */
 .origen-grid-2 {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
     gap: 15px;
 }
 
@@ -171,7 +170,7 @@ body.origen-app-body {
 
 .input-with-icon {
     position: relative;
-    display: block;
+    display: flex;
     align-items: center;
 }
 
@@ -263,7 +262,7 @@ input[type=range]::-webkit-slider-thumb {
     font-weight: 600;
     cursor: pointer;
     margin-top: 10px;
-    display: block;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -284,7 +283,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .origen-btn-outline {
-    display: block;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -340,7 +339,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .dash-header-user {
-    display: block;
+    display: flex;
     align-items: center;
     gap: 15px;
     margin-bottom: 30px;
@@ -353,7 +352,7 @@ input[type=range]::-webkit-slider-thumb {
     height: 50px;
     background: var(--surface-light);
     border-radius: 50%;
-    display: block;
+    display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
@@ -377,7 +376,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .origen-grid {
-    display: block;
+    display: flex;
     flex-direction: column;
     gap: 15px;
 }
@@ -391,7 +390,7 @@ input[type=range]::-webkit-slider-thumb {
     font-size: 15px;
     font-weight: 500;
     font-family: 'Inter', sans-serif;
-    display: block;
+    display: flex;
     align-items: center;
     gap: 15px;
     cursor: pointer;
@@ -418,7 +417,7 @@ input[type=range]::-webkit-slider-thumb {
 .view-header h3 {
     margin: 0 0 5px 0;
     font-size: 20px;
-    display: block;
+    display: flex;
     align-items: center;
     gap: 8px;
     color: var(--primary-color);
@@ -438,7 +437,7 @@ input[type=range]::-webkit-slider-thumb {
     font-weight: 500;
     font-family: 'Inter', sans-serif;
     cursor: pointer;
-    display: block;
+    display: flex;
     align-items: center;
     gap: 5px;
     padding: 0;
@@ -482,7 +481,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .card-header-id {
-    display: block;
+    display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 25px;
@@ -530,7 +529,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .card-footer-id {
-    display: block;
+    display: flex;
     justify-content: space-between;
     align-items: flex-end;
     position: relative;
@@ -573,7 +572,7 @@ input[type=range]::-webkit-slider-thumb {
     background: var(--surface-dark);
     padding: 15px;
     border-radius: 12px;
-    display: block;
+    display: flex;
     align-items: center;
     gap: 15px;
     border: 1px solid var(--border-color);
@@ -625,7 +624,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .calc-header {
-    display: block;
+    display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
@@ -741,7 +740,7 @@ input[type=range]::-webkit-slider-thumb {
     font-weight: 700;
     font-size: 15px;
     margin-bottom: 10px;
-    display: block;
+    display: flex;
     align-items: center;
     gap: 8px;
 }
@@ -767,7 +766,7 @@ input[type=range]::-webkit-slider-thumb {
     border-radius: 14px;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    display: block;
+    display: flex;
     flex-direction: column;
     transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
     position: relative;
@@ -784,7 +783,7 @@ input[type=range]::-webkit-slider-thumb {
     width: 100%;
     aspect-ratio: 1 / 1;
     background: #ffffff;
-    display: block;
+    display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
@@ -818,7 +817,7 @@ input[type=range]::-webkit-slider-thumb {
 
 .product-info {
     padding: 15px 12px;
-    display: block;
+    display: flex;
     flex-direction: column;
     flex-grow: 1;
     background: var(--surface-dark);
@@ -838,7 +837,7 @@ input[type=range]::-webkit-slider-thumb {
 
 .price-box {
     margin-bottom: 12px;
-    display: block;
+    display: flex;
     flex-direction: column;
     gap: 2px;
 }
@@ -865,7 +864,7 @@ input[type=range]::-webkit-slider-thumb {
 
 /* FLEXBOX DE AÑADIR AL CARRITO CON CANTIDAD (EVITA APILAMIENTO) */
 .origen-qty-cart {
-    display: block;
+    display: flex;
     gap: 6px;
     margin-top: auto;
     align-items: center;
@@ -904,7 +903,7 @@ input[type=range]::-webkit-slider-thumb {
     border-radius: 8px;
     font-size: 12px;
     font-weight: 600;
-    display: block;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 5px;

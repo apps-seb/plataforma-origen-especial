@@ -92,7 +92,8 @@ function get_precio_cafe_actual() {
         }
     }
 
-    set_transient( 'origen_precio_cafe', $precio_final, HOUR_IN_SECONDS );
+    // Reducir caché del mercado a 5 minutos
+    set_transient( 'origen_precio_cafe', $precio_final, 5 * MINUTE_IN_SECONDS );
     return $precio_final;
 }
 
@@ -134,7 +135,8 @@ function get_clima_finca( $ubicacion ) {
         'icono'       => $body['weather'][0]['icon']
     );
 
-    set_transient( $transient_key, $datos_clima, HOUR_IN_SECONDS );
+    // Reducir caché de clima a 15 minutos
+    set_transient( $transient_key, $datos_clima, 15 * MINUTE_IN_SECONDS );
     return $datos_clima;
 }
 
@@ -162,8 +164,11 @@ function origen_descuento_rol_caficultor( $price, $product ) {
 add_action( 'wp_enqueue_scripts', 'origen_special_assets' );
 function origen_special_assets() {
     if ( is_page( 'caficultores' ) ) {
-        wp_enqueue_style( 'origen-style', plugin_dir_url( __FILE__ ) . 'assets/css/style.css', array(), '4.2.0' );
-        wp_enqueue_script( 'origen-js', plugin_dir_url( __FILE__ ) . 'assets/js/app.js', array('jquery'), '4.2.0', true );
+        $css_ver = file_exists(plugin_dir_path(__FILE__) . 'assets/css/style.css') ? filemtime(plugin_dir_path(__FILE__) . 'assets/css/style.css') : '4.2.0';
+        $js_ver = file_exists(plugin_dir_path(__FILE__) . 'assets/js/app.js') ? filemtime(plugin_dir_path(__FILE__) . 'assets/js/app.js') : '4.2.0';
+
+        wp_enqueue_style( 'origen-style', plugin_dir_url( __FILE__ ) . 'assets/css/style.css', array(), $css_ver );
+        wp_enqueue_script( 'origen-js', plugin_dir_url( __FILE__ ) . 'assets/js/app.js', array('jquery'), $js_ver, true );
 
         wp_localize_script( 'origen-js', 'origenApp', array(
             'ajax_url'      => admin_url( 'admin-ajax.php' ),

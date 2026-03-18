@@ -250,20 +250,20 @@ jQuery(document).ready(function($) {
         $('#val-sim-humedad').text( $('#sim_humedad').val() + '%' );
         $('#val-sim-perdidas').text( $('#sim_perdidas').val() + '%' );
 
-        const ha = parseFloat($('#sim_ha').val());
-        const densidad = parseInt($('#sim_densidad').val());
+        const ha = parseFloat($('#sim_ha').val()) || 0;
+        const densidad = parseInt($('#sim_densidad').val()) || 0;
         const plantasTotales = ha * densidad;
 
-        const factorVar = parseFloat($('#sim_variedad').val());
-        const factorEdad = parseFloat($('#sim_edad').val());
-        const factorFert = parseFloat($('#sim_fertilizacion').val());
+        const factorVar = parseFloat($('#sim_variedad').val()) || 1;
+        const factorEdad = parseFloat($('#sim_edad').val()) || 1;
+        const factorFert = parseFloat($('#sim_fertilizacion').val()) || 1;
 
-        const humedad = parseInt($('#sim_humedad').val());
-        const perdidas = parseInt($('#sim_perdidas').val());
+        const humedad = parseInt($('#sim_humedad').val()) || 0;
+        const perdidas = parseInt($('#sim_perdidas').val()) || 0;
         const hintHumedad = $('#hint-humedad');
 
-        const precio = parseFloat($('#sim_precio').val());
-        const costoPorKg = parseFloat($('#sim_costo').val());
+        const precio = parseFloat($('#sim_precio').val()) || 0;
+        const costoPorKg = parseFloat($('#sim_costo').val()) || 0;
 
         // 1. Producción Base Teórica (aprox. 1.2kg por planta en condiciones óptimas)
         const rendimientoBasePlanta = 1.2;
@@ -322,6 +322,11 @@ jQuery(document).ready(function($) {
 
     // Escuchar cualquier cambio en los sliders para recalcular en vivo
     $('#sim_ha, #sim_densidad, #sim_variedad, #sim_edad, #sim_fertilizacion, #sim_humedad, #sim_perdidas, #sim_precio, #sim_costo').on('input change', calcularSimuladorEnVivo);
+
+    // Forzar calculo al cambiar a la pestaña de simulador
+    $('.origen-tab-btn[data-target="calc-sim"]').on('click', function(){
+        setTimeout(calcularSimuladorEnVivo, 100);
+    });
 
     // ==========================================
     // 8. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
