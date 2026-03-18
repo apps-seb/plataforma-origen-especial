@@ -118,6 +118,103 @@ body.origen-app-body {
 }
 
 /* ========================================================================
+   LANDING HERO PARA CAFICULTORES
+   ======================================================================== */
+.origen-landing-hero {
+    background: linear-gradient(145deg, var(--surface-dark) 0%, #111827 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 30px;
+    margin-bottom: 40px;
+    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.origen-landing-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary-color);
+}
+
+.hero-title {
+    margin: 0 0 15px 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hero-title i {
+    color: var(--primary-color);
+    font-size: 28px;
+}
+
+.hero-desc {
+    margin: 0 0 25px 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+.hero-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 30px 0;
+}
+
+.hero-features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.hero-features li:hover {
+    background: rgba(249, 115, 22, 0.05);
+    border-left-color: var(--primary-color);
+}
+
+.hero-features li i {
+    font-size: 18px;
+    color: var(--primary-color);
+    margin-top: 2px;
+}
+
+.hero-features li span {
+    flex-grow: 1;
+    line-height: 1.4;
+}
+
+.hero-btn {
+    text-decoration: none;
+    display: inline-flex;
+    font-size: 16px;
+    padding: 18px;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+    box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.hero-btn:hover {
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+    transform: translateY(-2px);
+}
+
+/* ========================================================================
    4. FORMULARIOS Y CAMPOS DE TEXTO
    ======================================================================== */
 .origen-grid-2 {
