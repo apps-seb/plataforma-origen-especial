@@ -94,6 +94,7 @@ function origen_special_register_settings() {
     register_setting( 'origen_special_settings_group', 'origen_precio_manual' );
     register_setting( 'origen_special_settings_group', 'origen_owm_api_key' );
     register_setting( 'origen_special_settings_group', 'origen_descuento_caficultor' );
+    register_setting( 'origen_special_settings_group', 'origen_tienda_categorias' );
 }
 
 // ========================================================================
@@ -677,7 +678,16 @@ function origen_special_tienda_html() {
     $plantas = $finca ? intval($finca->cantidad_plantas) : 0;
 
     // Categorías en WooCommerce
-    $categorias = array('fertilizantes', 'herramientas', 'insumos-agricolas', 'abonos');
+    $categorias_opt = get_option('origen_tienda_categorias', 'fertilizantes,herramientas,insumos-agricolas,abonos');
+    $categorias = array_map('trim', explode(',', $categorias_opt));
+
+    // Categoría seleccionada
+    $cat_filtro = isset($_GET['cat_agro']) ? sanitize_text_field($_GET['cat_agro']) : '';
+    if ( $cat_filtro && in_array( $cat_filtro, $categorias ) ) {
+        $categorias_query = array( $cat_filtro );
+    } else {
+        $categorias_query = $categorias;
+    }
 
     // LÓGICA DE DIAGNÓSTICO: Nombres específicos y amigables.
     if ( $hectareas > 0 ) {
@@ -707,7 +717,7 @@ function origen_special_tienda_html() {
             array(
                 'taxonomy' => 'product_cat',
                 'field'    => 'slug',
-                'terms'    => $categorias,
+                'terms'    => $categorias_query,
                 'operator' => 'IN'
             )
         )
@@ -718,10 +728,27 @@ function origen_special_tienda_html() {
     ob_start(); ?>
     <div class="origen-tienda-wrapper">
 
+        <div class="tienda-header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="origen-input-group" style="margin: 0; min-width: 200px;">
+                <select id="cat_agro_select" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+                    <option value="">Todas las categorías</option>
+                    <?php foreach ( $categorias as $cat ) :
+                        $term = get_term_by('slug', $cat, 'product_cat');
+                        $name = $term ? $term->name : ucfirst(str_replace('-', ' ', $cat));
+                    ?>
+                        <option value="<?php echo esc_attr($cat); ?>" <?php selected($cat_filtro, $cat); ?>><?php echo esc_html($name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <a href="<?php echo esc_url( wc_get_cart_url() ); ?>" class="origen-btn" style="background-color: var(--primary-color); display: inline-flex; align-items: center; gap: 8px; text-decoration: none;">
+                <i class="ph ph-shopping-cart"></i> Ver Carrito
+            </a>
+        </div>
+
         <?php echo $sugerencia_msg; ?>
 
         <?php if ( $loop->have_posts() ) : ?>
-            <div class="origen-store-grid">
+            <div class="origen-store-grid" id="origen-store-grid-container">
                 <?php while ( $loop->have_posts() ) : $loop->the_post();
                     global $product;
                     $regular_price = $product->get_regular_price();
@@ -756,11 +783,25 @@ function origen_special_tienda_html() {
         <?php else : ?>
             <div class="origen-msg error" style="display:block; text-align:left;">
                 <i class="ph ph-warning-circle" style="font-size:24px; margin-bottom:10px; display:block;"></i>
-                <strong>La tienda aún no tiene productos vinculados.</strong><br><br>
-                Para ver productos aquí, ve a <b>WordPress > Productos</b> y asígnales alguna de estas categorías: <b>fertilizantes</b>, <b>herramientas</b> o <b>abonos</b>.
+                <strong>No se encontraron productos en esta categoría.</strong><br><br>
             </div>
         <?php endif; ?>
     </div>
+
+    <script>
+    jQuery(document).ready(function($){
+        $('#cat_agro_select').on('change', function(){
+            var url = new URL(window.location.href);
+            var cat = $(this).val();
+            if(cat){
+                url.searchParams.set('cat_agro', cat);
+            } else {
+                url.searchParams.delete('cat_agro');
+            }
+            window.location.href = url.href;
+        });
+    });
+    </script>
     <?php return ob_get_clean();
 }
 
@@ -777,10 +818,13 @@ function origen_special_dashboard_html() {
     $num_formateado = chunk_split($num_tarjeta, 4, ' ');
     $vencimiento = date( 'm/y', strtotime( '+3 years', strtotime( $current_user->user_registered ) ) );
 
+    // Preserve the current view if we are filtering products
+    $initial_view = isset($_GET['cat_agro']) ? 'origen-view-tienda' : 'origen-view-home';
+
     ob_start(); ?>
     <div class="origen-dashboard">
 
-        <div id="origen-view-home" class="origen-main-view">
+        <div id="origen-view-home" class="origen-main-view" style="<?php echo $initial_view === 'origen-view-home' ? '' : 'display: none;'; ?>">
             <div class="dash-header-user">
                 <div class="avatar"><i class="ph ph-user"></i></div>
                 <div>
@@ -853,7 +897,7 @@ function origen_special_dashboard_html() {
             <?php echo do_shortcode('[origen_special_produccion]'); ?>
         </div>
 
-        <div id="origen-view-tienda" class="origen-main-view" style="display: none;">
+        <div id="origen-view-tienda" class="origen-main-view" style="<?php echo $initial_view === 'origen-view-tienda' ? '' : 'display: none;'; ?>">
             <button class="origen-back-btn nav-trigger" data-target="origen-view-home"><i class="ph ph-arrow-left"></i> Volver al Inicio</button>
             <div class="view-header"><h3><i class="ph ph-storefront"></i> Tienda Especializada</h3><p>Insumos agrícolas con descuento exclusivo.</p></div>
             <?php echo do_shortcode('[origen_special_tienda]'); ?>
@@ -1076,6 +1120,46 @@ function origen_special_init_gateway_class() {
             $this->description = $this->get_option( 'description' );
 
             add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+
+            // Scripts to update checkout on selection
+            add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
+
+            // Hook to add fee on checkout
+            add_action( 'woocommerce_cart_calculate_fees', array( $this, 'calculate_fees' ) );
+        }
+
+        public function payment_scripts() {
+            if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) ) {
+                return;
+            }
+
+            if ( ! $this->is_available() ) {
+                return;
+            }
+
+            $user_id = get_current_user_id();
+            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+            $puntos = $puntos ? floatval($puntos) : 0;
+            $puntos_fmt = number_format($puntos, 0, ',', '.');
+
+            wp_register_script( 'origen_puntos_gateway_script', '', array('jquery'), false, true );
+            wp_enqueue_script( 'origen_puntos_gateway_script' );
+            wp_add_inline_script( 'origen_puntos_gateway_script', "
+            jQuery(function($) {
+                $(document.body).on('updated_checkout', function() {
+                    const desc = $('.payment_method_origen_puntos .payment_box');
+                    if(desc.length && !desc.find('.origen-puntos-badge').length) {
+                        desc.append('<div class=\"origen-puntos-badge\" style=\"background:#10b981; color:white; padding:8px 12px; border-radius:6px; font-weight:bold; margin-top:10px; display:inline-block;\"><i class=\"ph-fill ph-coins\"></i> Tus Puntos Disponibles: ' + '$puntos_fmt' + ' Pts</div>');
+                    }
+                });
+
+                $(document).on('change', 'input[name=\"payment_method\"]', function() {
+                    if ($(this).val() === 'origen_puntos') {
+                        $('body').trigger('update_checkout');
+                    }
+                });
+            });
+            " );
         }
 
         public function init_form_fields() {
@@ -1115,6 +1199,25 @@ function origen_special_init_gateway_class() {
             return true;
         }
 
+        // Agregar concepto de puntos al carrito
+        public function calculate_fees( $cart ) {
+            if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
+
+            $chosen_payment_method = WC()->session->get( 'chosen_payment_method' );
+            if ( $chosen_payment_method === $this->id ) {
+                $user_id = get_current_user_id();
+                $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+                $puntos = $puntos ? floatval($puntos) : 0;
+
+                // Show a visual fee row indicating points being applied
+                $subtotal = $cart->get_subtotal();
+                $discount = $cart->get_discount_total();
+                $total_before_points = $subtotal - $discount;
+
+                $cart->add_fee( 'Pago con Puntos Origen (' . number_format($puntos, 0, ',', '.') . ' Disp.)', -$total_before_points, false );
+            }
+        }
+
         public function process_payment( $order_id ) {
             $order = wc_get_order( $order_id );
             $user_id = $order->get_user_id();
@@ -1126,16 +1229,23 @@ function origen_special_init_gateway_class() {
 
             $puntos = get_user_meta( $user_id, 'origen_puntos', true );
             $puntos = $puntos ? floatval($puntos) : 0;
-            $total = $order->get_total();
 
-            if ( $puntos >= $total ) {
+            // Re-calculate the original total before fee applied
+            $items_total = 0;
+            foreach ( $order->get_items() as $item ) {
+                $items_total += $item->get_total();
+            }
+            $shipping_total = $order->get_shipping_total();
+            $original_total = $items_total + $shipping_total;
+
+            if ( $puntos >= $original_total ) {
                 // Descontar puntos
-                $nuevos_puntos = $puntos - $total;
+                $nuevos_puntos = $puntos - $original_total;
                 update_user_meta( $user_id, 'origen_puntos', $nuevos_puntos );
 
                 // Completar pedido
                 $order->payment_complete();
-                $order->add_order_note( "Pago realizado con Puntos Origen SPECIAL. Puntos descontados: $total. Saldo restante: $nuevos_puntos." );
+                $order->add_order_note( "Pago realizado con Puntos Origen SPECIAL. Puntos descontados: $original_total. Saldo restante: $nuevos_puntos." );
                 WC()->cart->empty_cart();
 
                 return array(
@@ -1561,6 +1671,10 @@ function origen_special_admin_page() {
                     <tr valign="top">
                         <th scope="row">OpenWeatherMap API Key<br><small>Llave para el clima de las fincas.</small></th>
                         <td><input type="text" name="origen_owm_api_key" style="width:350px;" value="<?php echo esc_attr( get_option('origen_owm_api_key') ); ?>" /></td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row">Categorías de Tienda Agro<br><small>Separadas por comas (slugs de WooCommerce). Ej: fertilizantes,herramientas,abonos</small></th>
+                        <td><input type="text" name="origen_tienda_categorias" style="width:350px;" value="<?php echo esc_attr( get_option('origen_tienda_categorias', 'fertilizantes,herramientas,insumos-agricolas,abonos') ); ?>" /></td>
                     </tr>
                 </table>
                 <?php submit_button('Guardar Configuración'); ?>
