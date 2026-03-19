@@ -1,5 +1,13 @@
 jQuery(document).ready(function($) {
 
+    // Helper para hacer scroll arriba en la nueva arquitectura
+    function scrollToTop() {
+        const appWrapper = document.querySelector('.origen-app-wrapper');
+        if (appWrapper) {
+            appWrapper.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
     // ==========================================
     // 1. TABS GENERALES (LOGIN/REGISTRO Y SIMULADOR)
     // ==========================================
@@ -17,6 +25,9 @@ jQuery(document).ready(function($) {
 
         // Activar la pestaña actual
         btn.addClass('active');
+
+        // Scroll suave al contenedor fijo
+        scrollToTop();
 
         // Mostrar el formulario destino
         const formId = targetId.includes('calc') ? 'origen-' + targetId + '-form' : 'origen-' + targetId + '-form';
@@ -196,11 +207,14 @@ jQuery(document).ready(function($) {
     });
 
     // ==========================================
-    // 5. NAVEGACIÓN SPA DEL DASHBOARD (CORREGIDA)
+    // 5. NAVEGACIÓN SPA DEL DASHBOARD (CORREGIDA PARA APP FIJA)
     // ==========================================
     $('.nav-trigger').on('click', function(e) {
         e.preventDefault();
         const targetId = $(this).data('target');
+
+        // Usamos el helper que apunta a la nueva arquitectura
+        scrollToTop();
 
         // Ocultar absolutamente todas las vistas principales para evitar solapamientos
         $('.origen-main-view').hide();
