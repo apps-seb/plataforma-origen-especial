@@ -740,9 +740,9 @@ function origen_special_tienda_html() {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <a href="<?php echo esc_url( wc_get_cart_url() ); ?>" class="origen-btn" style="background-color: var(--primary-color); display: inline-flex; align-items: center; gap: 8px; text-decoration: none;">
+            <button class="origen-btn nav-trigger" data-target="origen-view-carrito" style="background-color: var(--primary-color); display: inline-flex; align-items: center; gap: 8px; text-decoration: none;">
                 <i class="ph ph-shopping-cart"></i> Ver Carrito
-            </a>
+            </button>
         </div>
 
         <?php echo $sugerencia_msg; ?>
@@ -860,12 +860,15 @@ function origen_special_dashboard_html() {
                     <button class="origen-card-btn nav-trigger" data-target="origen-view-solicitudes">
                         <i class="ph ph-list-dashes"></i> Mis Solicitudes
                     </button>
+                    <button class="origen-card-btn nav-trigger" data-target="origen-view-compras">
+                        <i class="ph ph-receipt"></i> Mis Compras
+                    </button>
                 <?php endif; ?>
 
                 <?php if ( class_exists( 'WooCommerce' ) ): ?>
-                    <a href="<?php echo esc_url( wc_get_cart_url() ); ?>" class="origen-card-btn">
+                    <button class="origen-card-btn nav-trigger" data-target="origen-view-carrito">
                         <i class="ph ph-shopping-cart"></i> Ver mi Carrito
-                    </a>
+                    </button>
                 <?php endif; ?>
 
                 <a href="<?php echo esc_url( wp_logout_url( site_url( '/caficultores' ) ) ); ?>" class="origen-btn-outline">
@@ -913,6 +916,20 @@ function origen_special_dashboard_html() {
             <button class="origen-back-btn nav-trigger" data-target="origen-view-home"><i class="ph ph-arrow-left"></i> Volver al Inicio</button>
             <div class="view-header"><h3><i class="ph ph-list-dashes"></i> Mis Solicitudes</h3><p>Historial y estado de tus propuestas de canje.</p></div>
             <?php echo do_shortcode('[origen_special_solicitudes_list]'); ?>
+        </div>
+
+        <div id="origen-view-compras" class="origen-main-view" style="display: none;">
+            <button class="origen-back-btn nav-trigger" data-target="origen-view-home"><i class="ph ph-arrow-left"></i> Volver al Inicio</button>
+            <div class="view-header"><h3><i class="ph ph-receipt"></i> Mis Compras</h3><p>Historial de tus compras en la tienda.</p></div>
+            <?php echo do_shortcode('[origen_special_compras_list]'); ?>
+        </div>
+
+        <div id="origen-view-carrito" class="origen-main-view" style="display: none;">
+            <button class="origen-back-btn nav-trigger" data-target="origen-view-tienda"><i class="ph ph-arrow-left"></i> Volver a la Tienda</button>
+            <div class="view-header"><h3><i class="ph ph-shopping-cart"></i> Mi Carrito</h3><p>Revisa tus productos antes de finalizar la compra.</p></div>
+            <div id="origen-carrito-container">
+                <div class="origen-msg loading" style="display:block;">Cargando carrito...</div>
+            </div>
         </div>
 
     </div>
@@ -1053,6 +1070,181 @@ function origen_special_solicitudes_list_html() {
         <?php endif; ?>
     </div>
     <?php return ob_get_clean();
+}
+
+// ========================================================================
+// SHORTCODE: LISTADO DE COMPRAS (USUARIO)
+// ========================================================================
+add_shortcode( 'origen_special_compras_list', 'origen_special_compras_list_html' );
+function origen_special_compras_list_html() {
+    if ( ! is_user_logged_in() ) return '';
+    if ( ! class_exists( 'WooCommerce' ) ) return '<div class="origen-msg error" style="display:block;">WooCommerce no está activo.</div>';
+
+    $user_id = get_current_user_id();
+
+    $customer_orders = wc_get_orders( array(
+        'customer' => $user_id,
+        'limit'    => 20,
+        'status'   => 'all'
+    ) );
+
+    ob_start(); ?>
+    <div class="origen-compras-wrapper">
+        <?php if ( empty($customer_orders) ) : ?>
+            <div class="origen-msg" style="display:block;">Aún no has realizado ninguna compra en la tienda.</div>
+        <?php else : ?>
+            <div class="solicitudes-list">
+                <?php foreach ( $customer_orders as $order ) :
+                    $status = $order->get_status();
+                    $status_name = wc_get_order_status_name($status);
+                    $estado_color = '#eab308'; // por defecto amarillo
+
+                    if ( in_array($status, array('completed', 'processing')) ) {
+                        $estado_color = '#10b981';
+                    } elseif ( in_array($status, array('cancelled', 'failed', 'refunded')) ) {
+                        $estado_color = '#ef4444';
+                    }
+                ?>
+                <div class="solicitud-card" style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span style="font-weight:600; color:var(--text-main);">Pedido #<?php echo esc_html($order->get_order_number()); ?></span>
+                        <span style="background:<?php echo $estado_color; ?>; color:#fff; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600; text-transform:uppercase;"><?php echo esc_html($status_name); ?></span>
+                    </div>
+                    <div class="origen-grid-2" style="margin-bottom:10px;">
+                        <div>
+                            <small style="color:var(--text-muted); display:block;">Total</small>
+                            <strong style="color:var(--primary-color);"><?php echo wp_kses_post($order->get_formatted_order_total()); ?></strong>
+                        </div>
+                        <div>
+                            <small style="color:var(--text-muted); display:block;">Artículos</small>
+                            <strong><?php echo esc_html($order->get_item_count()); ?></strong>
+                        </div>
+                    </div>
+                    <div>
+                        <small style="color:var(--text-muted); display:block;">Fecha: <?php echo esc_html(wc_format_datetime($order->get_date_created())); ?></small>
+                    </div>
+
+                    <div style="margin-top:10px; padding-top:10px; border-top: 1px solid #e2e8f0;">
+                        <small style="color:var(--text-muted); display:block; margin-bottom: 5px;">Productos:</small>
+                        <ul style="margin: 0; padding-left: 15px; font-size: 13px; color: var(--text-main);">
+                            <?php foreach ( $order->get_items() as $item_id => $item ) : ?>
+                                <li><?php echo esc_html($item->get_name()); ?> <strong style="color: var(--text-muted);">x<?php echo esc_html($item->get_quantity()); ?></strong></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php return ob_get_clean();
+}
+
+// ========================================================================
+// LÓGICAS AJAX CARRITO
+// ========================================================================
+add_action( 'wp_ajax_origen_get_cart', 'origen_ajax_get_cart' );
+function origen_ajax_get_cart() {
+    check_ajax_referer( 'origen_auth_nonce', 'nonce' );
+    if ( ! is_user_logged_in() || ! class_exists( 'WooCommerce' ) ) {
+        wp_send_json_error( 'Acceso denegado o WooCommerce inactivo.' );
+    }
+
+    if ( WC()->cart->is_empty() ) {
+        wp_send_json_success( '<div class="origen-msg" style="display:block;">Tu carrito está vacío.</div><button class="origen-btn nav-trigger" data-target="origen-view-tienda" style="margin-top: 15px;"><i class="ph ph-storefront"></i> Ir a la Tienda</button>' );
+    }
+
+    ob_start(); ?>
+    <div class="origen-cart-items">
+        <?php
+        foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+            $_product   = apply_filters( 'woocommerce_cart_item_product', $cart_item['data'], $cart_item, $cart_item_key );
+            $product_id = apply_filters( 'woocommerce_cart_item_product_id', $cart_item['product_id'], $cart_item, $cart_item_key );
+
+            if ( $_product && $_product->exists() && $cart_item['quantity'] > 0 && apply_filters( 'woocommerce_cart_item_visible', true, $cart_item, $cart_item_key ) ) {
+                $product_permalink = apply_filters( 'woocommerce_cart_item_permalink', $_product->is_visible() ? $_product->get_permalink( $cart_item ) : '', $cart_item, $cart_item_key );
+                ?>
+                <div class="origen-cart-item" style="display: flex; align-items: center; justify-content: space-between; background: var(--surface-dark); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="cart-item-thumbnail" style="width: 50px; height: 50px; border-radius: 8px; overflow: hidden; background: #fff;">
+                            <?php
+                            $thumbnail = apply_filters( 'woocommerce_cart_item_thumbnail', $_product->get_image(), $cart_item, $cart_item_key );
+                            if ( ! $product_permalink ) {
+                                echo $thumbnail;
+                            } else {
+                                printf( '<a href="%s">%s</a>', esc_url( $product_permalink ), $thumbnail );
+                            }
+                            ?>
+                        </div>
+                        <div class="cart-item-details">
+                            <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: 600; color: var(--text-main);">
+                                <?php
+                                if ( ! $product_permalink ) {
+                                    echo wp_kses_post( apply_filters( 'woocommerce_cart_item_name', $_product->get_name(), $cart_item, $cart_item_key ) . '&nbsp;' );
+                                } else {
+                                    echo wp_kses_post( apply_filters( 'woocommerce_cart_item_name', sprintf( '<a href="%s" style="color: inherit; text-decoration: none;">%s</a>', esc_url( $product_permalink ), $_product->get_name() ), $cart_item, $cart_item_key ) );
+                                }
+                                ?>
+                            </h4>
+                            <div style="font-size: 13px; color: var(--text-muted);">
+                                <?php
+                                echo apply_filters( 'woocommerce_cart_item_price', WC()->cart->get_product_price( $_product ), $cart_item, $cart_item_key );
+                                ?>
+                                <span style="margin-left: 10px;">Cant: <strong><?php echo $cart_item['quantity']; ?></strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="font-weight: 700; color: var(--primary-color);">
+                            <?php
+                            echo apply_filters( 'woocommerce_cart_item_subtotal', WC()->cart->get_product_subtotal( $_product, $cart_item['quantity'] ), $cart_item, $cart_item_key );
+                            ?>
+                        </div>
+                        <button class="origen-btn-remove-item" data-cart_item_key="<?php echo esc_attr( $cart_item_key ); ?>" style="background: transparent; border: none; color: var(--danger); font-size: 20px; cursor: pointer; padding: 5px;">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <?php
+            }
+        }
+        ?>
+    </div>
+
+    <div class="origen-cart-totals" style="background: var(--surface-dark); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 16px;">
+            <span>Subtotal:</span>
+            <strong><?php echo WC()->cart->get_cart_subtotal(); ?></strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 20px; font-weight: 700; color: var(--primary-color); border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <span>Total:</span>
+            <span><?php echo WC()->cart->get_total(); ?></span>
+        </div>
+
+        <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="origen-btn" style="text-decoration: none; text-align: center; display: block;">
+            <i class="ph ph-credit-card"></i> Proceder al Pago
+        </a>
+    </div>
+
+    <?php
+    $html = ob_get_clean();
+    wp_send_json_success( $html );
+}
+
+add_action( 'wp_ajax_origen_remove_cart_item', 'origen_ajax_remove_cart_item' );
+function origen_ajax_remove_cart_item() {
+    check_ajax_referer( 'origen_auth_nonce', 'nonce' );
+    if ( ! is_user_logged_in() || ! class_exists( 'WooCommerce' ) ) {
+        wp_send_json_error( 'Acceso denegado.' );
+    }
+
+    $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] );
+
+    if ( $cart_item_key && WC()->cart->remove_cart_item( $cart_item_key ) ) {
+        wp_send_json_success( 'Item eliminado' );
+    } else {
+        wp_send_json_error( 'Error al eliminar el item.' );
+    }
 }
 
 // ========================================================================
