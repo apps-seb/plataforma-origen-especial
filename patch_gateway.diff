@@ -1,0 +1,55 @@
+<<<<<<< SEARCH
+            $this->title       = $this->get_option( 'title' );
+            $this->description = $this->get_option( 'description' );
+
+            add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+        }
+
+        public function init_form_fields() {
+=======
+            $this->title       = $this->get_option( 'title' );
+            $this->description = $this->get_option( 'description' );
+
+            add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+
+            // Script para actualizar checkout al seleccionar puntos y mostrar puntos actuales
+            add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
+        }
+
+        public function payment_scripts() {
+            if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) ) {
+                return;
+            }
+            if ( ! $this->is_available() ) {
+                return;
+            }
+
+            $user_id = get_current_user_id();
+            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+            $puntos = $puntos ? floatval($puntos) : 0;
+
+            // Mostrar puntos disponibles en la pasarela, y actualizar checkout al elegir
+            wp_register_script( 'woocommerce_origen_puntos', '', array('jquery'), false, true );
+            wp_enqueue_script( 'woocommerce_origen_puntos' );
+
+            $script = "
+            jQuery(function($) {
+                $(document.body).on('updated_checkout', function() {
+                    const desc = $('.payment_method_origen_puntos .payment_box p');
+                    if(desc.length && !desc.find('.puntos-badge').length) {
+                        desc.append('<br><br><span class=\"puntos-badge\" style=\"background:#10b981; color:white; padding:5px 10px; border-radius:5px; font-weight:bold;\">Tus Puntos Disponibles: ' + " . number_format($puntos, 0, ',', '.') . " Pts</span>');
+                    }
+                });
+
+                $(document).on('change', 'input[name=\"payment_method\"]', function() {
+                    if($(this).val() === 'origen_puntos') {
+                        $('body').trigger('update_checkout');
+                    }
+                });
+            });
+            ";
+            wp_add_inline_script( 'woocommerce_origen_puntos', $script );
+        }
+
+        public function init_form_fields() {
+>>>>>>> REPLACE

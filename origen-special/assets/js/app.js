@@ -226,6 +226,15 @@ jQuery(document).ready(function($) {
         if(targetId === 'origen-view-produccion') {
             calcularSimuladorEnVivo();
         }
+
+        // Remove cat_agro from url when navigating away from the store
+        if (targetId !== 'origen-view-tienda') {
+            var url = new URL(window.location.href);
+            if (url.searchParams.has('cat_agro')) {
+                url.searchParams.delete('cat_agro');
+                window.history.replaceState({}, document.title, url.href);
+            }
+        }
     });
 
     // ==========================================
