@@ -356,7 +356,100 @@ jQuery(document).ready(function($) {
     });
 
     // ==========================================
-    // 8. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
+    // 8. FORMULARIO DE CANJE (TIEMPO REAL)
+    // ==========================================
+    let baseProduccionValor = 0;
+    let baseProduccionKg = 0;
+
+    function initCanjeView() {
+        if(!$('#canje-loading-overlay').length) return;
+        $('#canje-loading-overlay').show();
+        $('#origen-canje-form').hide();
+
+        $.ajax({
+            url: origenApp.ajax_url,
+            type: 'POST',
+            data: { action: 'origen_calculate_production', nonce: origenApp.nonce },
+            dataType: 'json',
+            success: function(res) {
+                $('#canje-loading-overlay').fadeOut(300, function() {
+                    $('#origen-canje-form').fadeIn(300);
+                });
+
+                if(res.success) {
+                    baseProduccionValor = parseFloat(res.data.valor.replace(/\./g, '').replace(/,/g, '')) || 0;
+                    baseProduccionKg = parseFloat(res.data.kg.replace(/\./g, '').replace(/,/g, '')) || 0;
+
+                    // Pintar valores base
+                    $('#canje-total-kg').text(baseProduccionKg.toLocaleString('es-CO', {maximumFractionDigits: 1}));
+                    $('#canje-total-valor').text('$' + baseProduccionValor.toLocaleString('es-CO'));
+                    $('#canje_valor_produccion').val(baseProduccionValor);
+                    $('#canje_kg_produccion').val(baseProduccionKg);
+
+                    // Disparar calculo inicial
+                    calcularCanjeEnVivo();
+                } else {
+                    $('#canje-loading-overlay').html('<div class="origen-msg error" style="display:block;">' + res.data + '</div>');
+                }
+            },
+            error: function() {
+                $('#canje-loading-overlay').html('<div class="origen-msg error" style="display:block;">Error de conexión.</div>');
+            }
+        });
+    }
+
+    // Si el usuario hace click en el boton del tab de canje
+    $('.nav-trigger[data-target="origen-view-canje"]').on('click', function(){
+        initCanjeView();
+    });
+
+    function calcularCanjeEnVivo() {
+        if (baseProduccionValor <= 0) return;
+
+        const porcentaje = parseFloat($('#canje_porcentaje').val()) || 0;
+        $('#canje-porcentaje-label').text(porcentaje);
+
+        const valorSolicitado = baseProduccionValor * (porcentaje / 100);
+        const kgSolicitados = baseProduccionKg * (porcentaje / 100);
+
+        $('#canje_valor_solicitado').val(valorSolicitado);
+        $('#canje-propuesta-valor').text('$' + valorSolicitado.toLocaleString('es-CO', {maximumFractionDigits: 0}));
+        $('#canje-propuesta-kg').text(kgSolicitados.toLocaleString('es-CO', {maximumFractionDigits: 1}));
+
+        if (valorSolicitado > 0) {
+            $('#btn-submit-canje').prop('disabled', false);
+        } else {
+            $('#btn-submit-canje').prop('disabled', true);
+        }
+    }
+
+    $('#canje_porcentaje').on('input change', calcularCanjeEnVivo);
+
+    $('#origen-canje-form').on('submit', function(e) {
+        e.preventDefault();
+        const btn = $('#btn-submit-canje');
+        const data = {
+            porcentaje: $('#canje_porcentaje').val(),
+            valor_produccion: $('#canje_valor_produccion').val(),
+            valor_solicitado: $('#canje_valor_solicitado').val(),
+            observaciones: $('#canje_observaciones').val()
+        };
+
+        if (parseFloat(data.valor_solicitado) <= 0) {
+            showMsg('origen-canje-msg', 'Por favor calcula primero el valor estimado.', 'error');
+            return;
+        }
+
+        doAjax('origen_submit_canje', data, btn, 'origen-canje-msg', function(res) {
+            showMsg('origen-canje-msg', res.data, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2500);
+        });
+    });
+
+    // ==========================================
+    // 9. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
     // ==========================================
     // Escucha cuando el usuario cambia el input de cantidad
     $('.origen-qty-input').on('input change', function() {

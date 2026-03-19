@@ -13,6 +13,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ========================================================================
 // 1. ACTIVACIÓN DEL PLUGIN Y REGISTRO DE OPCIONES
 // ========================================================================
+add_action('init', 'origen_special_check_db');
+function origen_special_check_db() {
+    global $wpdb;
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_propuestas'") != $table_propuestas) {
+        origen_special_activate();
+    }
+}
+
 register_activation_hook( __FILE__, 'origen_special_activate' );
 function origen_special_activate() {
     $roles = array(
@@ -58,8 +67,26 @@ function origen_special_activate() {
         UNIQUE KEY user_id (user_id)
     ) $charset_collate;";
 
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+    $sql_propuestas = "CREATE TABLE $table_propuestas (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) NOT NULL,
+        valor_produccion decimal(15,2) NOT NULL DEFAULT 0.00,
+        valor_solicitado decimal(15,2) NOT NULL DEFAULT 0.00,
+        porcentaje_canje decimal(5,2) NOT NULL DEFAULT 0.00,
+        estado varchar(50) NOT NULL DEFAULT 'pendiente',
+        observaciones text,
+        fecha datetime DEFAULT CURRENT_TIMESTAMP,
+        productos longtext,
+        asesor_id bigint(20) DEFAULT NULL,
+        PRIMARY KEY  (id),
+        KEY user_id (user_id),
+        KEY estado (estado)
+    ) $charset_collate;";
+
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
     dbDelta( $sql );
+    dbDelta( $sql_propuestas );
 }
 
 add_action( 'admin_init', 'origen_special_register_settings' );
@@ -764,6 +791,16 @@ function origen_special_dashboard_html() {
 
             <div class="origen-grid">
                 <?php if($role === 'caficultor'): ?>
+                    <div class="puntos-disponibles-card" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+                        <i class="ph ph-coins" style="font-size: 32px; margin-bottom: 10px;"></i>
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 500; opacity: 0.9;">Puntos Disponibles</h4>
+                        <?php
+                        $puntos = get_user_meta( $current_user->ID, 'origen_puntos', true );
+                        $puntos = $puntos ? floatval($puntos) : 0;
+                        ?>
+                        <div style="font-size: 28px; font-weight: 700; margin-top: 5px;"><?php echo number_format($puntos, 0, ',', '.'); ?> <small style="font-size: 14px; font-weight: 400; opacity: 0.8;">PTS</small></div>
+                    </div>
+
                     <button class="origen-card-btn nav-trigger" data-target="origen-view-finca">
                         <i class="ph ph-plant"></i> Mi Finca / Cultivo
                     </button>
@@ -772,6 +809,12 @@ function origen_special_dashboard_html() {
                     </button>
                     <button class="origen-card-btn nav-trigger" data-target="origen-view-tienda">
                         <i class="ph ph-storefront"></i> Tienda Agro
+                    </button>
+                    <button class="origen-card-btn nav-trigger" data-target="origen-view-canje" style="background-color: var(--primary-color); color: white; border-color: var(--primary-color);">
+                        <i class="ph ph-arrows-left-right"></i> Solicitar Canje
+                    </button>
+                    <button class="origen-card-btn nav-trigger" data-target="origen-view-solicitudes">
+                        <i class="ph ph-list-dashes"></i> Mis Solicitudes
                     </button>
                 <?php endif; ?>
 
@@ -816,12 +859,305 @@ function origen_special_dashboard_html() {
             <?php echo do_shortcode('[origen_special_tienda]'); ?>
         </div>
 
+        <div id="origen-view-canje" class="origen-main-view" style="display: none;">
+            <button class="origen-back-btn nav-trigger" data-target="origen-view-home"><i class="ph ph-arrow-left"></i> Volver al Inicio</button>
+            <div class="view-header"><h3><i class="ph ph-arrows-left-right"></i> Solicitar Canje</h3><p>Propón un porcentaje de tu producción para canjear por puntos.</p></div>
+            <?php echo do_shortcode('[origen_special_canje_form]'); ?>
+        </div>
+
+        <div id="origen-view-solicitudes" class="origen-main-view" style="display: none;">
+            <button class="origen-back-btn nav-trigger" data-target="origen-view-home"><i class="ph ph-arrow-left"></i> Volver al Inicio</button>
+            <div class="view-header"><h3><i class="ph ph-list-dashes"></i> Mis Solicitudes</h3><p>Historial y estado de tus propuestas de canje.</p></div>
+            <?php echo do_shortcode('[origen_special_solicitudes_list]'); ?>
+        </div>
+
     </div>
     <?php return ob_get_clean();
 }
 
 // ========================================================================
-// 10. LÓGICAS AJAX
+// SHORTCODE: FORMULARIO DE CANJE
+// ========================================================================
+add_shortcode( 'origen_special_canje_form', 'origen_special_canje_form_html' );
+function origen_special_canje_form_html() {
+    if ( ! is_user_logged_in() ) return '';
+
+    ob_start(); ?>
+    <div class="origen-canje-wrapper" style="position:relative;">
+        <!-- Capa de carga inicial -->
+        <div id="canje-loading-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(20,20,20,0.8); z-index:10; display:flex; justify-content:center; align-items:center; border-radius:12px;">
+            <div style="text-align:center; color:white;">
+                <i class="ph ph-spinner ph-spin" style="font-size:32px; color:var(--primary-color);"></i>
+                <p style="margin-top:10px; font-size:14px;">Calculando producción base...</p>
+            </div>
+        </div>
+
+        <form id="origen-canje-form" class="origen-form" style="display:none; padding:20px; background:var(--bg-card); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+
+            <!-- Banner de producción base (Total) -->
+            <div style="background:var(--bg-light); padding:15px; border-radius:8px; margin-bottom:20px; border-left:4px solid var(--primary-color);">
+                <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Tu Cosecha Base Estimada</div>
+                <div style="display:flex; justify-content:space-between; align-items:end;">
+                    <div style="font-size:24px; font-weight:700; color:var(--text-main);"><span id="canje-total-kg">0</span> <small style="font-size:14px; font-weight:400;">kg</small></div>
+                    <div style="font-size:16px; font-weight:600; color:var(--text-muted);"><span id="canje-total-valor">$0</span> COP</div>
+                </div>
+            </div>
+
+            <div class="origen-input-group">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    Porcentaje a Canjear:
+                    <span style="font-size:24px; font-weight:800; color:var(--primary-color);"><span id="canje-porcentaje-label">50</span>%</span>
+                </label>
+                <input type="range" id="canje_porcentaje" min="1" max="100" step="1" value="50" style="width:100%; height:6px; background:#333; border-radius:4px; outline:none; -webkit-appearance:none;">
+                <span class="hint" style="display:block; margin-top:10px;">Desliza para elegir cuánto de tu cosecha deseas ofrecer a cambio de puntos de la tienda.</span>
+            </div>
+
+            <div class="calc-indicator-box" style="margin-top:25px; background:linear-gradient(145deg, #1a1a1a, #2a2a2a); border:1px solid rgba(255,107,0,0.2);">
+                <div class="calc-header" style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:10px; margin-bottom:15px;">
+                    <h4>Valor de la Propuesta de Canje</h4>
+                </div>
+
+                <div class="origen-grid-2">
+                    <div style="text-align:center;">
+                        <span style="font-size:12px; color:var(--text-muted); display:block; text-transform:uppercase;">Equivalente en café</span>
+                        <div style="font-size:22px; font-weight:700; color:var(--text-main);"><span id="canje-propuesta-kg">0</span> <small style="font-size:12px; font-weight:400; color:var(--text-muted);">kg</small></div>
+                    </div>
+                    <div style="text-align:center; border-left:1px solid rgba(255,255,255,0.05);">
+                        <span style="font-size:12px; color:var(--text-muted); display:block; text-transform:uppercase;">Puntos a recibir</span>
+                        <div style="font-size:22px; font-weight:800; color:var(--primary-color);"><span id="canje-propuesta-valor">$0</span> <small style="font-size:12px; font-weight:400; color:var(--text-muted);">COP</small></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="origen-input-group" style="margin-top:25px;">
+                <label>Observaciones (Opcional)</label>
+                <textarea id="canje_observaciones" rows="2" placeholder="Ej: Me interesa canjear por fertilizantes..." style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:white;"></textarea>
+            </div>
+
+            <input type="hidden" id="canje_valor_produccion" value="0">
+            <input type="hidden" id="canje_valor_solicitado" value="0">
+            <!-- Save base kg for future backend features if needed -->
+            <input type="hidden" id="canje_kg_produccion" value="0">
+
+            <button type="submit" class="origen-btn" id="btn-submit-canje" style="margin-top:10px;"><i class="ph ph-paper-plane-right"></i> Enviar Propuesta</button>
+            <div id="origen-canje-msg" class="origen-msg" style="margin-top:15px;"></div>
+        </form>
+    </div>
+    <?php return ob_get_clean();
+}
+
+// ========================================================================
+// SHORTCODE: LISTADO DE SOLICITUDES (USUARIO)
+// ========================================================================
+add_shortcode( 'origen_special_solicitudes_list', 'origen_special_solicitudes_list_html' );
+function origen_special_solicitudes_list_html() {
+    if ( ! is_user_logged_in() ) return '';
+
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+
+    $propuestas = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table_propuestas WHERE user_id = %d ORDER BY fecha DESC", $user_id ) );
+
+    ob_start(); ?>
+    <div class="origen-solicitudes-wrapper">
+        <?php if ( empty($propuestas) ) : ?>
+            <div class="origen-msg" style="display:block;">Aún no has enviado ninguna propuesta de canje.</div>
+        <?php else : ?>
+            <div class="solicitudes-list">
+                <?php foreach ( $propuestas as $p ) :
+                    $estado_color = '#eab308'; // pendiente
+                    $estado_label = 'Pendiente';
+
+                    if ( $p->estado === 'aprobado' ) {
+                        $estado_color = '#10b981';
+                        $estado_label = 'Aprobada';
+                    } elseif ( $p->estado === 'rechazado' ) {
+                        $estado_color = '#ef4444';
+                        $estado_label = 'Rechazada';
+                    } elseif ( $p->estado === 'visita' ) {
+                        $estado_color = '#3b82f6';
+                        $estado_label = 'Visita Programada';
+                    }
+                ?>
+                <div class="solicitud-card" style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span style="font-weight:600; color:var(--text-main);">Propuesta #<?php echo esc_html($p->id); ?></span>
+                        <span style="background:<?php echo $estado_color; ?>; color:#fff; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600; text-transform:uppercase;"><?php echo $estado_label; ?></span>
+                    </div>
+                    <div class="origen-grid-2" style="margin-bottom:10px;">
+                        <div>
+                            <small style="color:var(--text-muted); display:block;">Valor Solicitado</small>
+                            <strong style="color:var(--primary-color);">$<?php echo number_format($p->valor_solicitado, 0, ',', '.'); ?> COP</strong>
+                        </div>
+                        <div>
+                            <small style="color:var(--text-muted); display:block;">Porcentaje</small>
+                            <strong><?php echo floatval($p->porcentaje_canje); ?>%</strong>
+                        </div>
+                    </div>
+                    <div>
+                        <small style="color:var(--text-muted); display:block;">Fecha: <?php echo date('d/m/Y', strtotime($p->fecha)); ?></small>
+                    </div>
+                    <?php if ( !empty($p->observaciones) && $p->estado !== 'pendiente' ) : ?>
+                    <div style="margin-top:10px; background:#f8fafc; padding:10px; border-radius:6px; font-size:13px;">
+                        <strong>Respuesta:</strong> <?php echo esc_html($p->observaciones); ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php return ob_get_clean();
+}
+
+// ========================================================================
+// LÓGICAS AJAX CANJE
+// ========================================================================
+add_action( 'wp_ajax_origen_submit_canje', 'origen_ajax_submit_canje' );
+function origen_ajax_submit_canje() {
+    check_ajax_referer( 'origen_auth_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Sesión caducada.' );
+    }
+
+    $user_id = get_current_user_id();
+    $porcentaje = floatval($_POST['porcentaje']);
+    $valor_produccion = floatval($_POST['valor_produccion']);
+    $valor_solicitado = floatval($_POST['valor_solicitado']);
+    $observaciones = sanitize_textarea_field($_POST['observaciones']);
+
+    if ($valor_solicitado <= 0) {
+        wp_send_json_error('El valor solicitado debe ser mayor a 0.');
+    }
+
+    global $wpdb;
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+
+    $data = array(
+        'user_id' => $user_id,
+        'valor_produccion' => $valor_produccion,
+        'valor_solicitado' => $valor_solicitado,
+        'porcentaje_canje' => $porcentaje,
+        'estado' => 'pendiente',
+        'observaciones' => $observaciones,
+        'fecha' => current_time('mysql')
+    );
+
+    $inserted = $wpdb->insert( $table_propuestas, $data );
+
+    if ($inserted) {
+        wp_send_json_success( '¡Propuesta de canje enviada con éxito! Pronto será revisada.' );
+    } else {
+        wp_send_json_error( 'Error al enviar la propuesta.' );
+    }
+}
+
+// ========================================================================
+// 10. PASARELA DE PAGO: PUNTOS ORIGEN SPECIAL
+// ========================================================================
+add_action( 'plugins_loaded', 'origen_special_init_gateway_class' );
+function origen_special_init_gateway_class() {
+    if ( ! class_exists( 'WC_Payment_Gateway' ) ) return;
+
+    class WC_Payment_Gateway_Origen_Puntos extends WC_Payment_Gateway {
+
+        public function __construct() {
+            $this->id                 = 'origen_puntos';
+            $this->icon               = '';
+            $this->has_fields         = false;
+            $this->method_title       = 'Puntos Origen SPECIAL';
+            $this->method_description = 'Permite a los caficultores pagar utilizando sus puntos de canje acumulados.';
+
+            $this->init_form_fields();
+            $this->init_settings();
+
+            $this->title       = $this->get_option( 'title' );
+            $this->description = $this->get_option( 'description' );
+
+            add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+        }
+
+        public function init_form_fields() {
+            $this->form_fields = array(
+                'enabled' => array(
+                    'title'   => 'Activar/Desactivar',
+                    'type'    => 'checkbox',
+                    'label'   => 'Activar pago con Puntos Origen SPECIAL',
+                    'default' => 'yes'
+                ),
+                'title' => array(
+                    'title'       => 'Título',
+                    'type'        => 'text',
+                    'description' => 'El título que verá el usuario durante el pago.',
+                    'default'     => 'Pago con Puntos Origen SPECIAL',
+                    'desc_tip'    => true,
+                ),
+                'description' => array(
+                    'title'       => 'Descripción',
+                    'type'        => 'textarea',
+                    'description' => 'La descripción que verá el usuario.',
+                    'default'     => 'Utiliza el saldo de tus puntos de canje aprobados para pagar tu pedido.',
+                )
+            );
+        }
+
+        public function is_available() {
+            if ( ! is_user_logged_in() ) return false;
+
+            $user_id = get_current_user_id();
+            $user = get_userdata($user_id);
+            if ( ! in_array( 'caficultor', (array) $user->roles ) ) return false;
+
+            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+            $puntos = $puntos ? floatval($puntos) : 0;
+
+            return true;
+        }
+
+        public function process_payment( $order_id ) {
+            $order = wc_get_order( $order_id );
+            $user_id = $order->get_user_id();
+
+            if ( ! $user_id ) {
+                wc_add_notice( 'Debes estar logueado para usar este método de pago.', 'error' );
+                return;
+            }
+
+            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+            $puntos = $puntos ? floatval($puntos) : 0;
+            $total = $order->get_total();
+
+            if ( $puntos >= $total ) {
+                // Descontar puntos
+                $nuevos_puntos = $puntos - $total;
+                update_user_meta( $user_id, 'origen_puntos', $nuevos_puntos );
+
+                // Completar pedido
+                $order->payment_complete();
+                $order->add_order_note( "Pago realizado con Puntos Origen SPECIAL. Puntos descontados: $total. Saldo restante: $nuevos_puntos." );
+                WC()->cart->empty_cart();
+
+                return array(
+                    'result'   => 'success',
+                    'redirect' => $this->get_return_url( $order )
+                );
+            } else {
+                wc_add_notice( 'No tienes suficientes puntos para cubrir el total de este pedido.', 'error' );
+                return;
+            }
+        }
+    }
+}
+
+add_filter( 'woocommerce_payment_gateways', 'origen_special_add_gateway_class' );
+function origen_special_add_gateway_class( $gateways ) {
+    $gateways[] = 'WC_Payment_Gateway_Origen_Puntos';
+    return $gateways;
+}
+
+// ========================================================================
+// 11. LÓGICAS AJAX
 // ========================================================================
 add_action( 'wp_ajax_nopriv_origen_register_action', 'origen_ajax_register' );
 add_action( 'wp_ajax_origen_register_action', 'origen_ajax_register' );
@@ -984,11 +1320,222 @@ function origen_ajax_calculate_production() {
 }
 
 // ========================================================================
+// PROCESAR PROPUESTAS DE CANJE (ADMIN)
+// ========================================================================
+add_action( 'admin_post_origen_procesar_propuesta', 'origen_procesar_propuesta_action' );
+function origen_procesar_propuesta_action() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die('Acceso denegado.');
+    }
+
+    check_admin_referer( 'origen_procesar_propuesta_nonce' );
+
+    global $wpdb;
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+
+    $propuesta_id = intval($_POST['propuesta_id']);
+    $estado_nuevo = sanitize_text_field($_POST['estado_nuevo']);
+    $respuesta_asesor = sanitize_textarea_field($_POST['respuesta_asesor']);
+    $asesor_id = get_current_user_id();
+
+    $propuesta = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_propuestas WHERE id = %d", $propuesta_id) );
+
+    if (!$propuesta) {
+        wp_die('Propuesta no encontrada.');
+    }
+
+    // Si ya está aprobada o rechazada, no se puede cambiar
+    if ($propuesta->estado === 'aprobado' || $propuesta->estado === 'rechazado') {
+        wp_die('Esta propuesta ya fue procesada.');
+    }
+
+    $data = array(
+        'estado' => $estado_nuevo,
+        'observaciones' => $respuesta_asesor,
+        'asesor_id' => $asesor_id
+    );
+
+    $wpdb->update( $table_propuestas, $data, array('id' => $propuesta_id) );
+
+    // Si es aprobada, asignar puntos al usuario
+    if ($estado_nuevo === 'aprobado') {
+        $puntos_actuales = get_user_meta($propuesta->user_id, 'origen_puntos', true);
+        $puntos_actuales = $puntos_actuales ? floatval($puntos_actuales) : 0;
+        $nuevos_puntos = $puntos_actuales + floatval($propuesta->valor_solicitado);
+
+        update_user_meta($propuesta->user_id, 'origen_puntos', $nuevos_puntos);
+    }
+
+    wp_redirect( admin_url('admin.php?page=origen-special-propuestas&msg=updated') );
+    exit;
+}
+
+// ========================================================================
 // 11. PANEL DE ADMINISTRACIÓN
 // ========================================================================
 add_action( 'admin_menu', 'origen_special_admin_menu' );
 function origen_special_admin_menu() {
     add_menu_page( 'Origen SPECIAL', 'Origen SPECIAL', 'manage_options', 'origen-special-users', 'origen_special_admin_page', 'dashicons-leaf', 30 );
+    add_submenu_page( 'origen-special-users', 'Propuestas de Canje', 'Propuestas de Canje', 'manage_options', 'origen-special-propuestas', 'origen_special_propuestas_page' );
+}
+
+function origen_special_propuestas_page() {
+    if ( ! current_user_can( 'manage_options' ) ) return;
+
+    global $wpdb;
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+
+    if ( isset($_GET['action']) && isset($_GET['id']) && $_GET['action'] == 'view' ) {
+        $id = intval($_GET['id']);
+        $propuesta = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_propuestas WHERE id = %d", $id) );
+        if (!$propuesta) {
+            echo '<div class="wrap"><h2>Propuesta no encontrada</h2></div>';
+            return;
+        }
+
+        $user_info = get_userdata($propuesta->user_id);
+        $cedula = get_user_meta($propuesta->user_id, 'cedula_cafetera', true);
+        $telefono = get_user_meta($propuesta->user_id, 'billing_phone', true); // WooCommerce phone si existe
+
+        $table_fincas = $wpdb->prefix . 'origen_fincas';
+        $finca = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_fincas WHERE user_id = %d", $propuesta->user_id) );
+
+        ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline">Detalle de Propuesta #<?php echo $propuesta->id; ?></h1>
+            <a href="?page=origen-special-propuestas" class="page-title-action">Volver al listado</a>
+
+            <div style="background:#fff; padding:20px; border:1px solid #ccd0d4; margin-top:20px; border-radius:5px; max-width:800px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #eee;">
+                    <div>
+                        <h2 style="margin:0;">Estado: <span style="text-transform:uppercase; color: <?php echo ($propuesta->estado == 'aprobado') ? '#10b981' : (($propuesta->estado == 'rechazado') ? '#ef4444' : (($propuesta->estado == 'visita') ? '#3b82f6' : '#eab308')); ?>"><?php echo esc_html($propuesta->estado); ?></span></h2>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong>Fecha de Solicitud:</strong><br><?php echo date('d/m/Y H:i', strtotime($propuesta->fecha)); ?>
+                    </div>
+                </div>
+
+                <table class="form-table">
+                    <tr>
+                        <th style="width: 200px;">Caficultor:</th>
+                        <td><?php echo esc_html($user_info->display_name); ?> (<?php echo esc_html($user_info->user_email); ?>)<br>
+                            Cédula: <?php echo esc_html($cedula); ?><br>
+                            Teléfono: <?php echo esc_html($telefono ? $telefono : 'No registrado'); ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Datos de Finca:</th>
+                        <td>
+                            <?php if ($finca) : ?>
+                                <strong>Nombre:</strong> <?php echo esc_html($finca->nombre_finca); ?><br>
+                                <strong>Ubicación:</strong> <?php echo esc_html($finca->ubicacion); ?><br>
+                                <strong>Hectáreas:</strong> <?php echo floatval($finca->hectareas); ?> ha<br>
+                                <strong>Plantas:</strong> <?php echo intval($finca->cantidad_plantas); ?>
+                            <?php else : ?>
+                                No hay datos de finca registrados.
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Cálculo de Producción (Estimado):</th>
+                        <td><strong>$<?php echo number_format($propuesta->valor_produccion, 0, ',', '.'); ?> COP</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Porcentaje Ofrecido:</th>
+                        <td><strong><?php echo floatval($propuesta->porcentaje_canje); ?>%</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Valor Solicitado en Puntos:</th>
+                        <td style="font-size:18px; color:#10b981;"><strong>$<?php echo number_format($propuesta->valor_solicitado, 0, ',', '.'); ?> COP (Pts)</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Observaciones del Caficultor:</th>
+                        <td><?php echo nl2br(esc_html($propuesta->observaciones)); ?></td>
+                    </tr>
+                </table>
+
+                <?php if ($propuesta->estado === 'pendiente' || $propuesta->estado === 'visita') : ?>
+                <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+                <h3>Acciones del Asesor</h3>
+                <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" style="background:#f8fafc; padding:20px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <input type="hidden" name="action" value="origen_procesar_propuesta">
+                    <input type="hidden" name="propuesta_id" value="<?php echo esc_attr($propuesta->id); ?>">
+                    <?php wp_nonce_field('origen_procesar_propuesta_nonce'); ?>
+
+                    <p>
+                        <label><strong>Respuesta / Observación para el caficultor:</strong></label><br>
+                        <textarea name="respuesta_asesor" rows="3" style="width:100%; margin-top:5px;"></textarea>
+                    </p>
+
+                    <div style="margin-top:15px; display:flex; gap:10px;">
+                        <button type="submit" name="estado_nuevo" value="aprobado" class="button button-primary" style="background:#10b981; border-color:#059669;" onclick="return confirm('¿Estás seguro de APROBAR esta propuesta? Se le cargarán <?php echo number_format($propuesta->valor_solicitado, 0, ',', '.'); ?> puntos al usuario.');">Aprobar y Cargar Puntos</button>
+
+                        <button type="submit" name="estado_nuevo" value="rechazado" class="button button-primary" style="background:#ef4444; border-color:#dc2626;" onclick="return confirm('¿Estás seguro de RECHAZAR esta propuesta?');">Rechazar</button>
+
+                        <button type="submit" name="estado_nuevo" value="visita" class="button button-secondary">Agendar Visita (Indica en la respuesta)</button>
+                    </div>
+                </form>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+        return;
+    }
+
+    // Listado general
+    $propuestas = $wpdb->get_results( "SELECT * FROM $table_propuestas ORDER BY fecha DESC" );
+    ?>
+    <div class="wrap">
+        <h1 class="wp-heading-inline">Propuestas Origen SPECIAL</h1>
+
+        <?php if ( isset($_GET['msg']) && $_GET['msg'] == 'updated' ) : ?>
+            <div class="notice notice-success is-dismissible"><p>Propuesta actualizada correctamente.</p></div>
+        <?php endif; ?>
+
+        <table class="wp-list-table widefat fixed striped" style="margin-top:20px;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Caficultor</th>
+                    <th>Valor Producción</th>
+                    <th>Valor Solicitado</th>
+                    <th>Porcentaje</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($propuestas)) : ?>
+                    <tr><td colspan="8">No hay propuestas registradas.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($propuestas as $p) :
+                        $user_info = get_userdata($p->user_id);
+                        $name = $user_info ? $user_info->display_name : 'Usuario Desconocido';
+
+                        $estado_color = '#eab308'; // pendiente
+                        if ( $p->estado === 'aprobado' ) $estado_color = '#10b981';
+                        elseif ( $p->estado === 'rechazado' ) $estado_color = '#ef4444';
+                        elseif ( $p->estado === 'visita' ) $estado_color = '#3b82f6';
+                    ?>
+                    <tr>
+                        <td>#<?php echo esc_html($p->id); ?></td>
+                        <td><strong><?php echo esc_html($name); ?></strong></td>
+                        <td>$<?php echo number_format($p->valor_produccion, 0, ',', '.'); ?></td>
+                        <td style="color:#10b981; font-weight:bold;">$<?php echo number_format($p->valor_solicitado, 0, ',', '.'); ?></td>
+                        <td><?php echo floatval($p->porcentaje_canje); ?>%</td>
+                        <td><span style="background:<?php echo $estado_color; ?>; color:#fff; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600; text-transform:uppercase;"><?php echo esc_html($p->estado); ?></span></td>
+                        <td><?php echo date('d/m/Y', strtotime($p->fecha)); ?></td>
+                        <td>
+                            <a href="?page=origen-special-propuestas&action=view&id=<?php echo $p->id; ?>" class="button button-small">Ver Detalle</a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php
 }
 
 function origen_special_admin_page() {
