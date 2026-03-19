@@ -14,31 +14,38 @@
 }
 
 /* ========================================================================
-   2. ESTRUCTURA BASE DE LA APLICACIÓN Y SCROLL
+   2. ESTRUCTURA BASE DE LA APLICACIÓN Y SCROLL (ARQUITECTURA FIJA)
    ======================================================================== */
-body.origen-app-body {
+html, body.origen-app-body {
     margin: 0;
     padding: 0;
+    width: 100%;
+    height: 100%;
     background-color: var(--bg-dark);
     color: var(--text-main);
     font-family: 'Inter', sans-serif;
-    min-height: 100vh;
-    background-image: radial-gradient(circle at top right, rgba(249, 115, 22, 0.1) 0%, transparent 50%);
-    overflow-x: hidden;
-    overflow-y: auto;
+    /* Bloqueo total del scroll del navegador para evitar colisiones */
+    overflow: hidden; 
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
 }
 
 .origen-app-wrapper {
     margin: 0 auto;
     width: 100%;
     max-width: 500px;
+    height: 100%; /* Ocupa el 100% de la pantalla estática */
     background-color: var(--bg-dark);
-    min-height: 100vh;
+    background-image: radial-gradient(circle at top right, rgba(249, 115, 22, 0.1) 0%, transparent 50%);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     position: relative;
+    /* Este es el contenedor real del scroll */
+    overflow-y: auto; 
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
 }
 
 .origen-app-header {
@@ -46,6 +53,7 @@ body.origen-app-body {
     text-align: center;
     border-bottom: 1px solid var(--border-color);
     background: linear-gradient(180deg, rgba(30,41,59,0.5) 0%, rgba(15,23,42,1) 100%);
+    flex-shrink: 0; /* Evita que el header se encoja */
 }
 
 .header-logo-icon i {
@@ -74,7 +82,7 @@ body.origen-app-body {
 }
 
 .origen-app-content {
-    padding: 30px 25px;
+    padding: 30px 25px 80px 25px; /* 80px inferior para evitar que la UI del navegador tape el final */
     flex-grow: 1;
 }
 
@@ -545,11 +553,6 @@ input[type=range]::-webkit-slider-thumb {
 
 .origen-back-btn:hover {
     color: var(--primary-color);
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 /* ========================================================================
