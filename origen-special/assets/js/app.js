@@ -356,7 +356,86 @@ jQuery(document).ready(function($) {
     });
 
     // ==========================================
-    // 8. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
+    // 8. FORMULARIO DE CANJE
+    // ==========================================
+    $('#btn-calcular-valor-canje').on('click', function(e) {
+        e.preventDefault();
+        const btn = $(this);
+        const originalText = btn.text();
+        btn.text('Calculando...').prop('disabled', true);
+
+        // Llamamos al motor de calculo para obtener el valor total
+        $.ajax({
+            url: origenApp.ajax_url,
+            type: 'POST',
+            data: { action: 'origen_calculate_production', nonce: origenApp.nonce },
+            dataType: 'json',
+            success: function(res) {
+                btn.text(originalText).prop('disabled', false);
+                if(res.success) {
+                    const valorTotal = parseFloat(res.data.valor.replace(/\./g, '').replace(/,/g, ''));
+                    const porcentaje = parseFloat($('#canje_porcentaje').val()) || 0;
+
+                    if (valorTotal > 0 && porcentaje > 0) {
+                        const valorSolicitado = valorTotal * (porcentaje / 100);
+
+                        $('#canje_valor_produccion').val(valorTotal);
+                        $('#canje_valor_solicitado').val(valorSolicitado);
+
+                        $('#canje-res-valor').html('$' + valorSolicitado.toLocaleString('es-CO', {maximumFractionDigits: 0}) + ' <small style="font-size:14px; color:var(--text-muted); font-weight:400;">COP (Puntos)</small>');
+
+                        $('#canje-prod-valor').text('$' + valorTotal.toLocaleString('es-CO', {maximumFractionDigits: 0}));
+                        $('#canje-prod-porcentaje').text(porcentaje + '%');
+                        $('#canje-solicitado-valor').text('$' + valorSolicitado.toLocaleString('es-CO', {maximumFractionDigits: 0}));
+
+                        $('#canje-info-detalle').slideDown();
+                        $('#btn-submit-canje').prop('disabled', false);
+                    } else {
+                        showMsg('origen-canje-msg', 'Ingresa un porcentaje válido mayor a 0.', 'error');
+                    }
+                } else {
+                    showMsg('origen-canje-msg', res.data, 'error');
+                }
+            },
+            error: function() {
+                btn.text(originalText).prop('disabled', false);
+                showMsg('origen-canje-msg', 'Error de conexión.', 'error');
+            }
+        });
+    });
+
+    $('#canje_porcentaje').on('input', function() {
+        // Al cambiar el porcentaje, requerimos recalcular
+        $('#canje-info-detalle').slideUp();
+        $('#btn-submit-canje').prop('disabled', true);
+        $('#canje-res-valor').html('$0 <small style="font-size:14px; color:var(--text-muted); font-weight:400;">COP (Puntos)</small>');
+    });
+
+    $('#origen-canje-form').on('submit', function(e) {
+        e.preventDefault();
+        const btn = $('#btn-submit-canje');
+        const data = {
+            porcentaje: $('#canje_porcentaje').val(),
+            valor_produccion: $('#canje_valor_produccion').val(),
+            valor_solicitado: $('#canje_valor_solicitado').val(),
+            observaciones: $('#canje_observaciones').val()
+        };
+
+        if (parseFloat(data.valor_solicitado) <= 0) {
+            showMsg('origen-canje-msg', 'Por favor calcula primero el valor estimado.', 'error');
+            return;
+        }
+
+        doAjax('origen_submit_canje', data, btn, 'origen-canje-msg', function(res) {
+            showMsg('origen-canje-msg', res.data, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2500);
+        });
+    });
+
+    // ==========================================
+    // 9. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
     // ==========================================
     // Escucha cuando el usuario cambia el input de cantidad
     $('.origen-qty-input').on('input change', function() {
