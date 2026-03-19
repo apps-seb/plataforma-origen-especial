@@ -13,12 +13,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ========================================================================
 // 1. ACTIVACIÓN DEL PLUGIN Y REGISTRO DE OPCIONES
 // ========================================================================
-add_action('init', 'origen_special_check_db');
+add_action('plugins_loaded', 'origen_special_check_db');
 function origen_special_check_db() {
-    global $wpdb;
-    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
-    if($wpdb->get_var("SHOW TABLES LIKE '$table_propuestas'") != $table_propuestas) {
+    $current_version = '4.2.0';
+    $installed_version = get_option('origen_special_version');
+
+    if ($installed_version !== $current_version) {
         origen_special_activate();
+        update_option('origen_special_version', $current_version);
     }
 }
 
@@ -1034,6 +1036,24 @@ function origen_ajax_submit_canje() {
     global $wpdb;
     $table_propuestas = $wpdb->prefix . 'origen_propuestas';
 
+    $productos_data = array('total' => 0, 'items' => array());
+    if ( class_exists('WooCommerce') && !is_null(WC()->cart) ) {
+        $cart = WC()->cart->get_cart();
+        foreach ($cart as $cart_item_key => $cart_item) {
+            if ( ! isset($cart_item['data']) ) continue;
+            $product = $cart_item['data'];
+            $productos_data['items'][] = array(
+                'id' => $cart_item['product_id'],
+                'nombre' => $product->get_name(),
+                'cantidad' => $cart_item['quantity'],
+                'precio' => $product->get_price(),
+                'total' => $cart_item['line_total']
+            );
+        }
+        $productos_data['total'] = WC()->cart->get_cart_contents_total();
+    }
+    $productos_json = wp_json_encode($productos_data);
+
     $data = array(
         'user_id' => $user_id,
         'valor_produccion' => $valor_produccion,
@@ -1041,12 +1061,16 @@ function origen_ajax_submit_canje() {
         'porcentaje_canje' => $porcentaje,
         'estado' => 'pendiente',
         'observaciones' => $observaciones,
-        'fecha' => current_time('mysql')
+        'fecha' => current_time('mysql'),
+        'productos' => $productos_json
     );
 
     $inserted = $wpdb->insert( $table_propuestas, $data );
 
     if ($inserted) {
+        if ( class_exists('WooCommerce') && !is_null(WC()->cart) ) {
+            WC()->cart->empty_cart();
+        }
         wp_send_json_success( '¡Propuesta de canje enviada con éxito! Pronto será revisada.' );
     } else {
         wp_send_json_error( 'Error al enviar la propuesta.' );
@@ -1054,106 +1078,170 @@ function origen_ajax_submit_canje() {
 }
 
 // ========================================================================
-// 10. PASARELA DE PAGO: PUNTOS ORIGEN SPECIAL
+// 10. RECOMPENSAS / PUNTOS WOOCOMMERCE CHECKOUT
 // ========================================================================
-add_action( 'plugins_loaded', 'origen_special_init_gateway_class' );
-function origen_special_init_gateway_class() {
-    if ( ! class_exists( 'WC_Payment_Gateway' ) ) return;
 
-    class WC_Payment_Gateway_Origen_Puntos extends WC_Payment_Gateway {
+// 10.1 Mostrar bloque de puntos en checkout
+add_action( 'woocommerce_review_order_before_payment', 'origen_mostrar_puntos_checkout' );
+function origen_mostrar_puntos_checkout() {
+    if ( ! is_user_logged_in() ) return;
 
-        public function __construct() {
-            $this->id                 = 'origen_puntos';
-            $this->icon               = '';
-            $this->has_fields         = false;
-            $this->method_title       = 'Puntos Origen SPECIAL';
-            $this->method_description = 'Permite a los caficultores pagar utilizando sus puntos de canje acumulados.';
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    if ( ! in_array( 'caficultor', (array) $user->roles ) ) return;
 
-            $this->init_form_fields();
-            $this->init_settings();
+    $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+    $puntos = $puntos ? floatval($puntos) : 0;
 
-            $this->title       = $this->get_option( 'title' );
-            $this->description = $this->get_option( 'description' );
+    if ( $puntos <= 0 ) return;
 
-            add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
-        }
+    // Obtener puntos aplicados actualmente a la sesión
+    $puntos_aplicados = WC()->session->get( 'origen_puntos_aplicados', 0 );
 
-        public function init_form_fields() {
-            $this->form_fields = array(
-                'enabled' => array(
-                    'title'   => 'Activar/Desactivar',
-                    'type'    => 'checkbox',
-                    'label'   => 'Activar pago con Puntos Origen SPECIAL',
-                    'default' => 'yes'
-                ),
-                'title' => array(
-                    'title'       => 'Título',
-                    'type'        => 'text',
-                    'description' => 'El título que verá el usuario durante el pago.',
-                    'default'     => 'Pago con Puntos Origen SPECIAL',
-                    'desc_tip'    => true,
-                ),
-                'description' => array(
-                    'title'       => 'Descripción',
-                    'type'        => 'textarea',
-                    'description' => 'La descripción que verá el usuario.',
-                    'default'     => 'Utiliza el saldo de tus puntos de canje aprobados para pagar tu pedido.',
-                )
-            );
-        }
+    ?>
+    <div id="origen-puntos-checkout" style="background: linear-gradient(135deg, #7020F2, #5a18c6); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px;">
+        <h3 style="color:white; margin-top:0; font-size:18px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
+            <i class="ph-fill ph-star" style="color:#eab308;"></i> TUS PUNTOS
+        </h3>
 
-        public function is_available() {
-            if ( ! is_user_logged_in() ) return false;
+        <div style="display:flex; justify-content:space-between; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:8px;">
+            <div>
+                <span style="font-size:11px; opacity:0.8; display:block; text-transform:uppercase;">Disponible</span>
+                <strong style="font-size:24px;"><?php echo number_format($puntos, 0, ',', '.'); ?></strong>
+            </div>
+            <div style="text-align:right;">
+                <span style="font-size:11px; opacity:0.8; display:block; text-transform:uppercase;">Ahorro</span>
+                <strong style="font-size:24px; color:#10b981;">$<?php echo number_format($puntos_aplicados, 0, ',', '.'); ?></strong>
+            </div>
+        </div>
 
-            $user_id = get_current_user_id();
-            $user = get_userdata($user_id);
-            if ( ! in_array( 'caficultor', (array) $user->roles ) ) return false;
+        <div style="background:#fff; border-radius:8px; overflow:hidden; margin-bottom:10px;">
+            <label style="display:block; padding:15px 15px 10px; color:#333; font-weight:600; cursor:pointer;">
+                <input type="checkbox" id="origen_usar_puntos" <?php checked($puntos_aplicados > 0); ?> style="margin-right:8px;"> Pago con Puntos Origen SPECIAL
+            </label>
+            <div id="origen-puntos-input-wrap" style="<?php echo ($puntos_aplicados > 0) ? 'display:block;' : 'display:none;'; ?> padding:0 15px 15px;">
+                <p style="color:#666; font-size:13px; margin-top:0;">Utiliza el saldo de tus puntos de canje aprobados para pagar tu pedido.</p>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="number" id="origen_puntos_monto" value="<?php echo esc_attr($puntos_aplicados > 0 ? $puntos_aplicados : $puntos); ?>" max="<?php echo esc_attr($puntos); ?>" style="flex:1; border:1px solid #ddd; padding:8px; border-radius:4px; text-align:right;">
+                    <button type="button" id="origen_aplicar_puntos" class="button" style="background:#7020F2; color:#fff; border-color:#7020F2;">Aplicar</button>
+                </div>
+            </div>
+        </div>
 
-            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
-            $puntos = $puntos ? floatval($puntos) : 0;
+        <p style="font-size:12px; margin:0; opacity:0.9; text-align:center;">Realiza compras para acumular puntos.</p>
+    </div>
 
-            return true;
-        }
-
-        public function process_payment( $order_id ) {
-            $order = wc_get_order( $order_id );
-            $user_id = $order->get_user_id();
-
-            if ( ! $user_id ) {
-                wc_add_notice( 'Debes estar logueado para usar este método de pago.', 'error' );
-                return;
-            }
-
-            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
-            $puntos = $puntos ? floatval($puntos) : 0;
-            $total = $order->get_total();
-
-            if ( $puntos >= $total ) {
-                // Descontar puntos
-                $nuevos_puntos = $puntos - $total;
-                update_user_meta( $user_id, 'origen_puntos', $nuevos_puntos );
-
-                // Completar pedido
-                $order->payment_complete();
-                $order->add_order_note( "Pago realizado con Puntos Origen SPECIAL. Puntos descontados: $total. Saldo restante: $nuevos_puntos." );
-                WC()->cart->empty_cart();
-
-                return array(
-                    'result'   => 'success',
-                    'redirect' => $this->get_return_url( $order )
-                );
+    <script>
+    jQuery(function($){
+        $('#origen_usar_puntos').on('change', function(){
+            if($(this).is(':checked')){
+                $('#origen-puntos-input-wrap').slideDown();
             } else {
-                wc_add_notice( 'No tienes suficientes puntos para cubrir el total de este pedido.', 'error' );
-                return;
+                $('#origen-puntos-input-wrap').slideUp();
+                // Remover puntos si desmarca
+                $.post( '<?php echo admin_url('admin-ajax.php'); ?>', {
+                    action: 'origen_remover_puntos',
+                    nonce: '<?php echo wp_create_nonce("origen_puntos_nonce"); ?>'
+                }, function(res) {
+                    $('body').trigger('update_checkout');
+                });
             }
-        }
+        });
+
+        $('#origen_aplicar_puntos').on('click', function(e){
+            e.preventDefault();
+            var monto = $('#origen_puntos_monto').val();
+            var btn = $(this);
+            btn.text('...');
+            $.post( '<?php echo admin_url('admin-ajax.php'); ?>', {
+                action: 'origen_aplicar_puntos',
+                monto: monto,
+                nonce: '<?php echo wp_create_nonce("origen_puntos_nonce"); ?>'
+            }, function(res) {
+                btn.text('Aplicar');
+                if(res.success){
+                    $('body').trigger('update_checkout');
+                } else {
+                    alert(res.data);
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// 10.2 AJAX Aplicar Puntos
+add_action('wp_ajax_origen_aplicar_puntos', 'origen_ajax_aplicar_puntos');
+function origen_ajax_aplicar_puntos() {
+    check_ajax_referer('origen_puntos_nonce', 'nonce');
+    if(!is_user_logged_in()) wp_send_json_error('No autorizado');
+
+    $monto = floatval($_POST['monto']);
+    if($monto <= 0) {
+        WC()->session->set('origen_puntos_aplicados', 0);
+        wp_send_json_error('Monto inválido');
+    }
+
+    $user_id = get_current_user_id();
+    $puntos_disponibles = floatval(get_user_meta($user_id, 'origen_puntos', true));
+
+    if($monto > $puntos_disponibles) {
+        wp_send_json_error('No tienes suficientes puntos.');
+    }
+
+    WC()->session->set('origen_puntos_aplicados', $monto);
+    wp_send_json_success();
+}
+
+// 10.3 AJAX Remover Puntos
+add_action('wp_ajax_origen_remover_puntos', 'origen_ajax_remover_puntos');
+function origen_ajax_remover_puntos() {
+    check_ajax_referer('origen_puntos_nonce', 'nonce');
+    WC()->session->set('origen_puntos_aplicados', 0);
+    wp_send_json_success();
+}
+
+// 10.4 Aplicar descuento al carrito
+add_action('woocommerce_cart_calculate_fees', 'origen_aplicar_descuento_puntos');
+function origen_aplicar_descuento_puntos( $cart ) {
+    if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
+
+    $puntos_aplicados = WC()->session->get('origen_puntos_aplicados', 0);
+    if($puntos_aplicados > 0) {
+        $subtotal = $cart->get_cart_contents_total();
+        // El descuento no puede ser mayor que el subtotal del carrito
+        $descuento = min($puntos_aplicados, $subtotal);
+        $cart->add_fee( 'Pago con Puntos', -$descuento, false );
     }
 }
 
-add_filter( 'woocommerce_payment_gateways', 'origen_special_add_gateway_class' );
-function origen_special_add_gateway_class( $gateways ) {
-    $gateways[] = 'WC_Payment_Gateway_Origen_Puntos';
-    return $gateways;
+// 10.5 Descontar puntos de la cuenta cuando se completa el pedido
+add_action('woocommerce_checkout_order_processed', 'origen_procesar_puntos_pedido', 10, 3);
+function origen_procesar_puntos_pedido( $order_id, $posted_data, $order ) {
+    $puntos_aplicados = WC()->session->get('origen_puntos_aplicados', 0);
+    if($puntos_aplicados > 0) {
+        $user_id = $order->get_user_id();
+        if($user_id) {
+            // Check the actual applied fee amount from the order to avoid over-deducting
+            $puntos_descontados = 0;
+            foreach ($order->get_fees() as $fee) {
+                if ($fee->get_name() === 'Pago con Puntos') {
+                    $puntos_descontados = abs(floatval($fee->get_total()));
+                    break;
+                }
+            }
+
+            if ($puntos_descontados > 0) {
+                $puntos_actuales = floatval(get_user_meta($user_id, 'origen_puntos', true));
+                $nuevos_puntos = $puntos_actuales - $puntos_descontados;
+                update_user_meta($user_id, 'origen_puntos', max(0, $nuevos_puntos));
+
+                $order->add_order_note( "Se descontaron {$puntos_descontados} Puntos Origen SPECIAL." );
+            }
+        }
+        WC()->session->set('origen_puntos_aplicados', 0);
+    }
 }
 
 // ========================================================================
@@ -1447,6 +1535,24 @@ function origen_special_propuestas_page() {
                     <tr>
                         <th>Valor Solicitado en Puntos:</th>
                         <td style="font-size:18px; color:#10b981;"><strong>$<?php echo number_format($propuesta->valor_solicitado, 0, ',', '.'); ?> COP (Pts)</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Productos Solicitados:</th>
+                        <td>
+                            <?php
+                            $productos = json_decode($propuesta->productos, true);
+                            if (!empty($productos) && isset($productos['items']) && count($productos['items']) > 0) {
+                                echo '<ul style="margin:0; padding-left:20px;">';
+                                foreach($productos['items'] as $item) {
+                                    echo '<li>' . esc_html($item['cantidad']) . 'x ' . esc_html($item['nombre']) . ' - $' . number_format($item['total'], 0, ',', '.') . ' COP</li>';
+                                }
+                                echo '</ul>';
+                                echo '<br><strong>Total Carrito: $' . number_format($productos['total'], 0, ',', '.') . ' COP</strong>';
+                            } else {
+                                echo 'Ningún producto seleccionado en el momento del canje.';
+                            }
+                            ?>
+                        </td>
                     </tr>
                     <tr>
                         <th>Observaciones del Caficultor:</th>
