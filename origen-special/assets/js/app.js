@@ -356,60 +356,74 @@ jQuery(document).ready(function($) {
     });
 
     // ==========================================
-    // 8. FORMULARIO DE CANJE
+    // 8. FORMULARIO DE CANJE (TIEMPO REAL)
     // ==========================================
-    $('#btn-calcular-valor-canje').on('click', function(e) {
-        e.preventDefault();
-        const btn = $(this);
-        const originalText = btn.text();
-        btn.text('Calculando...').prop('disabled', true);
+    let baseProduccionValor = 0;
+    let baseProduccionKg = 0;
 
-        // Llamamos al motor de calculo para obtener el valor total
+    function initCanjeView() {
+        if(!$('#canje-loading-overlay').length) return;
+        $('#canje-loading-overlay').show();
+        $('#origen-canje-form').hide();
+
         $.ajax({
             url: origenApp.ajax_url,
             type: 'POST',
             data: { action: 'origen_calculate_production', nonce: origenApp.nonce },
             dataType: 'json',
             success: function(res) {
-                btn.text(originalText).prop('disabled', false);
+                $('#canje-loading-overlay').fadeOut(300, function() {
+                    $('#origen-canje-form').fadeIn(300);
+                });
+
                 if(res.success) {
-                    const valorTotal = parseFloat(res.data.valor.replace(/\./g, '').replace(/,/g, ''));
-                    const porcentaje = parseFloat($('#canje_porcentaje').val()) || 0;
+                    baseProduccionValor = parseFloat(res.data.valor.replace(/\./g, '').replace(/,/g, '')) || 0;
+                    baseProduccionKg = parseFloat(res.data.kg.replace(/\./g, '').replace(/,/g, '')) || 0;
 
-                    if (valorTotal > 0 && porcentaje > 0) {
-                        const valorSolicitado = valorTotal * (porcentaje / 100);
+                    // Pintar valores base
+                    $('#canje-total-kg').text(baseProduccionKg.toLocaleString('es-CO', {maximumFractionDigits: 1}));
+                    $('#canje-total-valor').text('$' + baseProduccionValor.toLocaleString('es-CO'));
+                    $('#canje_valor_produccion').val(baseProduccionValor);
+                    $('#canje_kg_produccion').val(baseProduccionKg);
 
-                        $('#canje_valor_produccion').val(valorTotal);
-                        $('#canje_valor_solicitado').val(valorSolicitado);
-
-                        $('#canje-res-valor').html('$' + valorSolicitado.toLocaleString('es-CO', {maximumFractionDigits: 0}) + ' <small style="font-size:14px; color:var(--text-muted); font-weight:400;">COP (Puntos)</small>');
-
-                        $('#canje-prod-valor').text('$' + valorTotal.toLocaleString('es-CO', {maximumFractionDigits: 0}));
-                        $('#canje-prod-porcentaje').text(porcentaje + '%');
-                        $('#canje-solicitado-valor').text('$' + valorSolicitado.toLocaleString('es-CO', {maximumFractionDigits: 0}));
-
-                        $('#canje-info-detalle').slideDown();
-                        $('#btn-submit-canje').prop('disabled', false);
-                    } else {
-                        showMsg('origen-canje-msg', 'Ingresa un porcentaje válido mayor a 0.', 'error');
-                    }
+                    // Disparar calculo inicial
+                    calcularCanjeEnVivo();
                 } else {
-                    showMsg('origen-canje-msg', res.data, 'error');
+                    $('#canje-loading-overlay').html('<div class="origen-msg error" style="display:block;">' + res.data + '</div>');
                 }
             },
             error: function() {
-                btn.text(originalText).prop('disabled', false);
-                showMsg('origen-canje-msg', 'Error de conexión.', 'error');
+                $('#canje-loading-overlay').html('<div class="origen-msg error" style="display:block;">Error de conexión.</div>');
             }
         });
+    }
+
+    // Si el usuario hace click en el boton del tab de canje
+    $('.nav-trigger[data-target="origen-view-canje"]').on('click', function(){
+        initCanjeView();
     });
 
-    $('#canje_porcentaje').on('input', function() {
-        // Al cambiar el porcentaje, requerimos recalcular
-        $('#canje-info-detalle').slideUp();
-        $('#btn-submit-canje').prop('disabled', true);
-        $('#canje-res-valor').html('$0 <small style="font-size:14px; color:var(--text-muted); font-weight:400;">COP (Puntos)</small>');
-    });
+    function calcularCanjeEnVivo() {
+        if (baseProduccionValor <= 0) return;
+
+        const porcentaje = parseFloat($('#canje_porcentaje').val()) || 0;
+        $('#canje-porcentaje-label').text(porcentaje);
+
+        const valorSolicitado = baseProduccionValor * (porcentaje / 100);
+        const kgSolicitados = baseProduccionKg * (porcentaje / 100);
+
+        $('#canje_valor_solicitado').val(valorSolicitado);
+        $('#canje-propuesta-valor').text('$' + valorSolicitado.toLocaleString('es-CO', {maximumFractionDigits: 0}));
+        $('#canje-propuesta-kg').text(kgSolicitados.toLocaleString('es-CO', {maximumFractionDigits: 1}));
+
+        if (valorSolicitado > 0) {
+            $('#btn-submit-canje').prop('disabled', false);
+        } else {
+            $('#btn-submit-canje').prop('disabled', true);
+        }
+    }
+
+    $('#canje_porcentaje').on('input change', calcularCanjeEnVivo);
 
     $('#origen-canje-form').on('submit', function(e) {
         e.preventDefault();

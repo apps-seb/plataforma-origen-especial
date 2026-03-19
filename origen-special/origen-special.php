@@ -13,6 +13,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ========================================================================
 // 1. ACTIVACIÓN DEL PLUGIN Y REGISTRO DE OPCIONES
 // ========================================================================
+add_action('init', 'origen_special_check_db');
+function origen_special_check_db() {
+    global $wpdb;
+    $table_propuestas = $wpdb->prefix . 'origen_propuestas';
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_propuestas'") != $table_propuestas) {
+        origen_special_activate();
+    }
+}
+
 register_activation_hook( __FILE__, 'origen_special_activate' );
 function origen_special_activate() {
     $roles = array(
@@ -874,36 +883,64 @@ function origen_special_canje_form_html() {
     if ( ! is_user_logged_in() ) return '';
 
     ob_start(); ?>
-    <div class="origen-canje-wrapper">
-        <form id="origen-canje-form" class="origen-form">
-            <div class="origen-input-group">
-                <label>Porcentaje de Producción a Canjear (%)</label>
-                <input type="number" id="canje_porcentaje" min="1" max="100" step="1" value="50" required>
-                <span class="hint">Indica qué porcentaje del total de tu cosecha deseas ofrecer para obtener puntos en tienda.</span>
+    <div class="origen-canje-wrapper" style="position:relative;">
+        <!-- Capa de carga inicial -->
+        <div id="canje-loading-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(20,20,20,0.8); z-index:10; display:flex; justify-content:center; align-items:center; border-radius:12px;">
+            <div style="text-align:center; color:white;">
+                <i class="ph ph-spinner ph-spin" style="font-size:32px; color:var(--primary-color);"></i>
+                <p style="margin-top:10px; font-size:14px;">Calculando producción base...</p>
             </div>
+        </div>
 
-            <div class="calc-indicator-box" style="margin-top:20px;">
-                <div class="calc-header">
-                    <h4>Valor Estimado Solicitado</h4>
-                    <button type="button" id="btn-calcular-valor-canje" class="origen-btn-outline" style="padding: 5px 10px; font-size: 12px; height: auto;">Calcular / Actualizar</button>
+        <form id="origen-canje-form" class="origen-form" style="display:none; padding:20px; background:var(--bg-card); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+
+            <!-- Banner de producción base (Total) -->
+            <div style="background:var(--bg-light); padding:15px; border-radius:8px; margin-bottom:20px; border-left:4px solid var(--primary-color);">
+                <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Tu Cosecha Base Estimada</div>
+                <div style="display:flex; justify-content:space-between; align-items:end;">
+                    <div style="font-size:24px; font-weight:700; color:var(--text-main);"><span id="canje-total-kg">0</span> <small style="font-size:14px; font-weight:400;">kg</small></div>
+                    <div style="font-size:16px; font-weight:600; color:var(--text-muted);"><span id="canje-total-valor">$0</span> COP</div>
                 </div>
-                <div style="text-align:center; font-size:32px; font-weight:800; color:var(--primary-color);" id="canje-res-valor">$0 <small style="font-size:14px; color:var(--text-muted); font-weight:400;">COP (Puntos)</small></div>
             </div>
 
-            <div id="canje-info-detalle" style="display:none; margin-top:15px; background:var(--bg-light); padding:15px; border-radius:8px; font-size:13px; color:var(--text-muted);">
-                Tu producción total estimada es de <strong id="canje-prod-valor" style="color:var(--text-main);">$0</strong> COP. Solicitando un <strong id="canje-prod-porcentaje">50%</strong>, el valor de canje propuesto sería de <strong id="canje-solicitado-valor" style="color:var(--text-main);">$0</strong> COP.
+            <div class="origen-input-group">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    Porcentaje a Canjear:
+                    <span style="font-size:24px; font-weight:800; color:var(--primary-color);"><span id="canje-porcentaje-label">50</span>%</span>
+                </label>
+                <input type="range" id="canje_porcentaje" min="1" max="100" step="1" value="50" style="width:100%; height:6px; background:#333; border-radius:4px; outline:none; -webkit-appearance:none;">
+                <span class="hint" style="display:block; margin-top:10px;">Desliza para elegir cuánto de tu cosecha deseas ofrecer a cambio de puntos de la tienda.</span>
             </div>
 
-            <div class="origen-input-group" style="margin-top:20px;">
-                <label>Observaciones o Productos de Interés (Opcional)</label>
-                <textarea id="canje_observaciones" rows="3" placeholder="Ej: Me interesa canjear por fertilizantes y herramientas..."></textarea>
+            <div class="calc-indicator-box" style="margin-top:25px; background:linear-gradient(145deg, #1a1a1a, #2a2a2a); border:1px solid rgba(255,107,0,0.2);">
+                <div class="calc-header" style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:10px; margin-bottom:15px;">
+                    <h4>Valor de la Propuesta de Canje</h4>
+                </div>
+
+                <div class="origen-grid-2">
+                    <div style="text-align:center;">
+                        <span style="font-size:12px; color:var(--text-muted); display:block; text-transform:uppercase;">Equivalente en café</span>
+                        <div style="font-size:22px; font-weight:700; color:var(--text-main);"><span id="canje-propuesta-kg">0</span> <small style="font-size:12px; font-weight:400; color:var(--text-muted);">kg</small></div>
+                    </div>
+                    <div style="text-align:center; border-left:1px solid rgba(255,255,255,0.05);">
+                        <span style="font-size:12px; color:var(--text-muted); display:block; text-transform:uppercase;">Puntos a recibir</span>
+                        <div style="font-size:22px; font-weight:800; color:var(--primary-color);"><span id="canje-propuesta-valor">$0</span> <small style="font-size:12px; font-weight:400; color:var(--text-muted);">COP</small></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="origen-input-group" style="margin-top:25px;">
+                <label>Observaciones (Opcional)</label>
+                <textarea id="canje_observaciones" rows="2" placeholder="Ej: Me interesa canjear por fertilizantes..." style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:white;"></textarea>
             </div>
 
             <input type="hidden" id="canje_valor_produccion" value="0">
             <input type="hidden" id="canje_valor_solicitado" value="0">
+            <!-- Save base kg for future backend features if needed -->
+            <input type="hidden" id="canje_kg_produccion" value="0">
 
-            <button type="submit" class="origen-btn" id="btn-submit-canje" disabled><i class="ph ph-paper-plane-right"></i> Enviar Propuesta de Canje</button>
-            <div id="origen-canje-msg" class="origen-msg"></div>
+            <button type="submit" class="origen-btn" id="btn-submit-canje" style="margin-top:10px;"><i class="ph ph-paper-plane-right"></i> Enviar Propuesta</button>
+            <div id="origen-canje-msg" class="origen-msg" style="margin-top:15px;"></div>
         </form>
     </div>
     <?php return ob_get_clean();
@@ -1017,7 +1054,110 @@ function origen_ajax_submit_canje() {
 }
 
 // ========================================================================
-// 10. LÓGICAS AJAX
+// 10. PASARELA DE PAGO: PUNTOS ORIGEN SPECIAL
+// ========================================================================
+add_action( 'plugins_loaded', 'origen_special_init_gateway_class' );
+function origen_special_init_gateway_class() {
+    if ( ! class_exists( 'WC_Payment_Gateway' ) ) return;
+
+    class WC_Payment_Gateway_Origen_Puntos extends WC_Payment_Gateway {
+
+        public function __construct() {
+            $this->id                 = 'origen_puntos';
+            $this->icon               = '';
+            $this->has_fields         = false;
+            $this->method_title       = 'Puntos Origen SPECIAL';
+            $this->method_description = 'Permite a los caficultores pagar utilizando sus puntos de canje acumulados.';
+
+            $this->init_form_fields();
+            $this->init_settings();
+
+            $this->title       = $this->get_option( 'title' );
+            $this->description = $this->get_option( 'description' );
+
+            add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+        }
+
+        public function init_form_fields() {
+            $this->form_fields = array(
+                'enabled' => array(
+                    'title'   => 'Activar/Desactivar',
+                    'type'    => 'checkbox',
+                    'label'   => 'Activar pago con Puntos Origen SPECIAL',
+                    'default' => 'yes'
+                ),
+                'title' => array(
+                    'title'       => 'Título',
+                    'type'        => 'text',
+                    'description' => 'El título que verá el usuario durante el pago.',
+                    'default'     => 'Pago con Puntos Origen SPECIAL',
+                    'desc_tip'    => true,
+                ),
+                'description' => array(
+                    'title'       => 'Descripción',
+                    'type'        => 'textarea',
+                    'description' => 'La descripción que verá el usuario.',
+                    'default'     => 'Utiliza el saldo de tus puntos de canje aprobados para pagar tu pedido.',
+                )
+            );
+        }
+
+        public function is_available() {
+            if ( ! is_user_logged_in() ) return false;
+
+            $user_id = get_current_user_id();
+            $user = get_userdata($user_id);
+            if ( ! in_array( 'caficultor', (array) $user->roles ) ) return false;
+
+            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+            $puntos = $puntos ? floatval($puntos) : 0;
+
+            return true;
+        }
+
+        public function process_payment( $order_id ) {
+            $order = wc_get_order( $order_id );
+            $user_id = $order->get_user_id();
+
+            if ( ! $user_id ) {
+                wc_add_notice( 'Debes estar logueado para usar este método de pago.', 'error' );
+                return;
+            }
+
+            $puntos = get_user_meta( $user_id, 'origen_puntos', true );
+            $puntos = $puntos ? floatval($puntos) : 0;
+            $total = $order->get_total();
+
+            if ( $puntos >= $total ) {
+                // Descontar puntos
+                $nuevos_puntos = $puntos - $total;
+                update_user_meta( $user_id, 'origen_puntos', $nuevos_puntos );
+
+                // Completar pedido
+                $order->payment_complete();
+                $order->add_order_note( "Pago realizado con Puntos Origen SPECIAL. Puntos descontados: $total. Saldo restante: $nuevos_puntos." );
+                WC()->cart->empty_cart();
+
+                return array(
+                    'result'   => 'success',
+                    'redirect' => $this->get_return_url( $order )
+                );
+            } else {
+                wc_add_notice( 'No tienes suficientes puntos para cubrir el total de este pedido.', 'error' );
+                return;
+            }
+        }
+    }
+}
+
+add_filter( 'woocommerce_payment_gateways', 'origen_special_add_gateway_class' );
+function origen_special_add_gateway_class( $gateways ) {
+    $gateways[] = 'WC_Payment_Gateway_Origen_Puntos';
+    return $gateways;
+}
+
+// ========================================================================
+// 11. LÓGICAS AJAX
 // ========================================================================
 add_action( 'wp_ajax_nopriv_origen_register_action', 'origen_ajax_register' );
 add_action( 'wp_ajax_origen_register_action', 'origen_ajax_register' );
