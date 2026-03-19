@@ -227,6 +227,11 @@ jQuery(document).ready(function($) {
             calcularSimuladorEnVivo();
         }
 
+        // Si entra al carrito, cargar los items
+        if(targetId === 'origen-view-carrito') {
+            cargarCarrito();
+        }
+
         // Remove cat_agro from url when navigating away from the store
         if (targetId !== 'origen-view-tienda') {
             var url = new URL(window.location.href);
@@ -387,7 +392,7 @@ jQuery(document).ready(function($) {
 
                 if(res.success) {
                     baseProduccionValor = parseFloat(res.data.valor.replace(/\./g, '').replace(/,/g, '')) || 0;
-                    baseProduccionKg = parseFloat(res.data.kg.replace(/\./g, '').replace(/,/g, '')) || 0;
+                    baseProduccionKg = parseFloat(res.data.kg.replace(/\./g, '').replace(/,/g, '.')) || 0;
 
                     // Pintar valores base
                     $('#canje-total-kg').text(baseProduccionKg.toLocaleString('es-CO', {maximumFractionDigits: 1}));
@@ -458,7 +463,63 @@ jQuery(document).ready(function($) {
     });
 
     // ==========================================
-    // 9. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
+    // 9. CARRITO WOOCOMMERCE AJAX
+    // ==========================================
+    function cargarCarrito() {
+        const container = $('#origen-carrito-container');
+        container.html('<div class="origen-msg loading" style="display:block;">Cargando carrito...</div>');
+
+        $.ajax({
+            url: origenApp.ajax_url,
+            type: 'POST',
+            data: { action: 'origen_get_cart', nonce: origenApp.nonce },
+            dataType: 'json',
+            success: function(res) {
+                if(res.success) {
+                    container.html(res.data);
+                } else {
+                    container.html('<div class="origen-msg error" style="display:block;">' + res.data + '</div>');
+                }
+            },
+            error: function() {
+                container.html('<div class="origen-msg error" style="display:block;">Error de conexión al cargar el carrito.</div>');
+            }
+        });
+    }
+
+    // Delegar evento de eliminar del carrito
+    $(document).on('click', '.origen-btn-remove-item', function(e) {
+        e.preventDefault();
+        const btn = $(this);
+        const cartItemKey = btn.data('cart_item_key');
+
+        btn.prop('disabled', true);
+        btn.html('<i class="ph ph-spinner ph-spin"></i>');
+
+        $.ajax({
+            url: origenApp.ajax_url,
+            type: 'POST',
+            data: { action: 'origen_remove_cart_item', nonce: origenApp.nonce, cart_item_key: cartItemKey },
+            dataType: 'json',
+            success: function(res) {
+                if(res.success) {
+                    cargarCarrito();
+                } else {
+                    alert('Error al eliminar el producto.');
+                    btn.prop('disabled', false);
+                    btn.html('<i class="ph ph-trash"></i>');
+                }
+            },
+            error: function() {
+                alert('Error de conexión.');
+                btn.prop('disabled', false);
+                btn.html('<i class="ph ph-trash"></i>');
+            }
+        });
+    });
+
+    // ==========================================
+    // 10. TIENDA WOOCOMMERCE: SINCRONIZAR CANTIDAD
     // ==========================================
     // Escucha cuando el usuario cambia el input de cantidad
     $('.origen-qty-input').on('input change', function() {
