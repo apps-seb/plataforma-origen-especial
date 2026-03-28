@@ -1,0 +1,185 @@
+:root {
+    --primary-color: #2E7D32;
+    --primary-dark: #1B5E20;
+    --bg-color: #121212;
+    --surface-color: #1E1E1E;
+    --text-color: #FFFFFF;
+    --text-muted: #A0A0A0;
+    --danger: #CF6679;
+}
+
+body.origen-app-body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.origen-app-wrapper {
+    width: 100%;
+    max-width: 480px;
+    background-color: var(--surface-color);
+    min-height: 100vh;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.origen-app-header {
+    background: var(--primary-dark);
+    padding: 30px 20px;
+    text-align: center;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.origen-app-header h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #fff;
+}
+
+.origen-app-header p {
+    margin: 5px 0 0;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.origen-app-content {
+    padding: 20px;
+    flex-grow: 1;
+}
+
+/* Auth Tabs */
+.origen-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.origen-tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 15px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.origen-tab-btn.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+}
+
+/* Forms */
+.origen-input-group {
+    margin-bottom: 15px;
+}
+
+.origen-input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.origen-input-group input,
+.origen-input-group select {
+    width: 100%;
+    padding: 12px;
+    background: #2C2C2C;
+    border: 1px solid #444;
+    color: #fff;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+.origen-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.origen-btn:hover { background: var(--primary-dark); }
+
+/* Dashboard */
+.origen-dashboard h2 {
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+.origen-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.origen-card-btn {
+    background: #2C2C2C;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    font-size: 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.origen-card-btn:hover { background: #383838; }
+
+.origen-btn-outline {
+    display: block;
+    text-align: center;
+    padding: 15px;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    text-decoration: none;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+/* Messages */
+.origen-msg {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 14px;
+    display: none;
+}
+.origen-msg.error { background: rgba(207, 102, 121, 0.2); color: var(--danger); display: block; }
+.origen-msg.success { background: rgba(46, 125, 50, 0.2); color: #81C784; display: block; }
+.origen-msg.loading { color: var(--text-muted); display: block; }
+.origen-radio-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 5px;
+}
+
+.origen-radio-group label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: #fff;
+    cursor: pointer;
+}
+
+.origen-radio-group input[type="radio"] {
+    width: auto;
+    margin: 0;
+}
